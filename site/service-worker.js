@@ -1,7 +1,7 @@
-const CACHE_NAME = 'smart-akademia-school-shell-v5';
+const CACHE_NAME = 'smart-akademia-school-shell-v6-logo';
 const APP_SHELL = [
   './', './index.html', './administration.html', './manifest.webmanifest',
-  './icons/icon-192.png', './icons/icon-512.png'
+  './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './assets/smart-akademia-emblem.webp', './assets/smart-akademia-logo-complet.webp'
 ];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

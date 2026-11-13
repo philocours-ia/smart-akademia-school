@@ -10,8 +10,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SMART AKADEMIA">
     <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
     <title>SMART AKADEMIA SCHOOL - Espace Élève | Prof. Julio Rakotonirina</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -88,19 +89,20 @@
     <section id="auth-screen" class="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
         <div class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-3xl overflow-hidden shadow-2xl">
             <div class="hidden lg:flex flex-col justify-between p-10 text-white bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-hidden">
-                <div class="absolute -right-10 -bottom-12 text-[18rem] leading-none text-gold-500/10 font-display">Φ</div>
+                <div class="absolute -right-10 -bottom-12 text-[18rem] leading-none text-gold-500/10 pointer-events-none"><i class="fas fa-graduation-cap"></i></div>
                 <div class="relative z-10">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-navy-950 font-display font-bold text-3xl shadow-lg">Φ</div>
-                    <p class="mt-8 text-xs uppercase tracking-[.25em] text-gold-400 font-bold">Plateforme éducative</p>
-                    <h1 class="font-display text-3xl font-bold mt-3 leading-tight">SMART<br>AKADEMIA SCHOOL</h1>
-                    <p class="text-slate-300 mt-4 leading-relaxed text-sm">Un lycée numérique pour accompagner les élèves de Madagascar dans leur parcours scolaire. Consultez les ressources de présentation et souscrivez pour accéder aux cours complets selon le calendrier annuel.</p>
+                    <img src="./assets/smart-akademia-emblem.webp" alt="Emblème Smart Akademia School : chapeau de diplômé, livres et stylos" class="w-full max-w-md mx-auto object-contain drop-shadow-2xl rounded-2xl" width="1310" height="627" fetchpriority="high">
+                    <p class="mt-2 text-center text-xs uppercase tracking-[.25em] text-gold-400 font-bold">Lycée numérique</p>
+                    <h1 class="font-display text-3xl font-bold mt-2 leading-tight text-center">SMART AKADEMIA SCHOOL</h1>
+                    <p class="text-gold-300 text-xs font-semibold tracking-[.18em] text-center mt-2">APPRENDRE • PROGRESSER • RÉUSSIR</p>
+                    <p class="text-slate-300 mt-5 leading-relaxed text-sm">Un lycée numérique pour accompagner les élèves de Madagascar dans leur parcours scolaire. Consultez les ressources de présentation et souscrivez pour accéder aux cours complets selon le calendrier annuel.</p>
                 </div>
                 <div class="relative z-10 text-xs text-slate-400">Prof. RAKOTONIRINA Nasandratriniaina Julio</div>
             </div>
             <div class="p-6 sm:p-9 md:p-11">
                 <div class="lg:hidden flex items-center gap-3 mb-7">
-                    <div class="w-11 h-11 rounded-xl bg-navy-900 text-gold-400 flex items-center justify-center font-display font-bold text-2xl">Φ</div>
-                    <div><p class="font-display font-bold text-navy-900">SMART AKADEMIA SCHOOL</p><p class="text-[11px] text-slate-500">Prof. Julio Rakotonirina</p></div>
+                    <img src="./icons/icon-192.png" alt="Logo Smart Akademia School" class="w-14 h-14 rounded-2xl shadow-md object-cover" width="192" height="192">
+                    <div><p class="font-display font-bold text-navy-900">SMART AKADEMIA SCHOOL</p><p class="text-[11px] text-slate-500">Lycée numérique • Madagascar</p></div>
                 </div>
                 <div class="mb-6">
                     <p class="text-xs font-bold uppercase tracking-widest text-gold-600">Espace élève</p>
@@ -157,7 +159,7 @@
     <section id="admin-auth-screen" class="hidden min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
         <div class="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl">
             <div class="bg-navy-950 text-white p-7 border-b border-gold-500/30">
-                <div class="w-12 h-12 rounded-xl bg-gold-500 text-navy-950 flex items-center justify-center font-display text-2xl font-bold">Φ</div>
+                <img src="./icons/icon-192.png" alt="Logo Smart Akademia School" class="w-16 h-16 rounded-2xl shadow-lg object-cover" width="192" height="192">
                 <p class="text-xs uppercase tracking-[.2em] text-gold-400 font-bold mt-5">Accès confidentiel</p>
                 <h1 class="font-display text-2xl font-bold mt-1">Espace administrateur</h1>
                 <p class="text-xs text-slate-300 mt-2">Réservé à l'administration de Smart Akademia School.</p>
@@ -199,9 +201,7 @@
     <header id="student-app-header" class="bg-navy-900 text-white sticky top-0 z-40 shadow-lg border-b border-gold-500/30">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('accueil')">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-navy-900 font-display font-bold text-xl shadow-md">
-                    Φ
-                </div>
+                <img src="./icons/icon-192.png" alt="Logo Smart Akademia School" class="w-11 h-11 rounded-xl object-cover shadow-md ring-1 ring-gold-400/60" width="192" height="192">
                 <div>
                     <h1 class="font-display font-bold text-base md:text-lg tracking-wider text-gold-400 leading-tight">
                         SMART AKADEMIA SCHOOL
@@ -271,7 +271,7 @@
         <section id="view-accueil" class="view-section fade-in space-y-6">
             <!-- Bannière Héro -->
             <div class="bg-gradient-to-br from-navy-900 via-navy-800 to-navy-950 rounded-2xl p-6 md:p-8 text-white shadow-xl border border-gold-500/20 relative overflow-hidden">
-                <div class="absolute -right-8 -bottom-8 text-gold-500/10 text-9xl font-display select-none pointer-events-none">Φ</div>
+                <div class="absolute -right-8 -bottom-8 text-gold-500/10 text-9xl select-none pointer-events-none"><i class="fas fa-graduation-cap"></i></div>
                 <div class="relative z-10 max-w-3xl space-y-4">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-400/30 text-gold-400 text-xs font-semibold">
                         <i class="fas fa-graduation-cap"></i> En appui aux Programmes d’études et RAPE du MEN
@@ -619,10 +619,13 @@
         <!-- ==================== 8. ONGLET ESPACE ADMIN / ENSEIGNANT ==================== -->
         <section id="view-admin" class="view-section hidden fade-in space-y-6">
             <div class="bg-navy-950 text-white rounded-2xl p-6 shadow-lg border border-gold-500/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <span class="text-xs font-bold uppercase tracking-wider text-gold-400">Tableau de Bord Enseignant Certifié</span>
-                    <h2 class="font-display text-2xl font-bold mt-1">Administration SMART AKADEMIA SCHOOL</h2>
-                    <p class="text-xs text-slate-300 mt-1">Gestion des demandes de paiement MVola / Binance Pay, réponses aux élèves, animation du Forum et enrichissement des contenus.</p>
+                <div class="flex items-center gap-4">
+                    <img src="./icons/icon-192.png" alt="Logo Smart Akademia School" class="w-14 h-14 rounded-2xl object-cover shadow-md ring-1 ring-gold-400/60 shrink-0" width="192" height="192">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-gold-400">Tableau de Bord Enseignant Certifié</span>
+                        <h2 class="font-display text-2xl font-bold mt-1">Administration SMART AKADEMIA SCHOOL</h2>
+                        <p class="text-xs text-slate-300 mt-1">Gestion des demandes de paiement MVola / Binance Pay, réponses aux élèves, animation du Forum et enrichissement des contenus.</p>
+                    </div>
                 </div>
                 <button onclick="logoutAdmin()" class="self-start px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold transition">
                     <i class="fas fa-sign-out-alt"></i> Quitter Admin
