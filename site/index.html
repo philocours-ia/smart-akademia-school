@@ -923,11 +923,13 @@
         // La clé publique anon est prévue pour le navigateur; ne jamais placer ici une clé service_role.
         // =========================================================================
         const SUPABASE_CONFIG = {
-            url: 'https://VOTRE-PROJET.supabase.co',
-            anonKey: 'VOTRE_CLE_ANON_PUBLIQUE',
-            // Adresse du compte Auth admin (à configurer une seule fois dans Supabase).
+            url: 'https://dipcfwrxjyowpkrkncrs.supabase.co',
+            // Clé publishable publique du projet. Elle peut être utilisée dans le navigateur;
+            // la sécurité des données repose sur les politiques RLS et les contrôles serveur.
+            anonKey: 'sb_publishable_RzKdnHECPJ-wGgnSGt2uFg_9w2-R3sZ',
+            // Adresse du compte Auth administrateur autorisé dans la migration SQL.
             // Le nom de connexion affiché à l'écran reste « akademia ».
-            adminEmail: 'VOTRE_EMAIL_ADMIN'
+            adminEmail: 'julio7271@gmail.com'
         };
         const ADMIN_LOGIN_NAME = 'akademia';
         let supabaseClient = null;

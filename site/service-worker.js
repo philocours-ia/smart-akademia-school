@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-akademia-school-shell-v4';
+const CACHE_NAME = 'smart-akademia-school-shell-v5';
 const APP_SHELL = [
   './', './index.html', './administration.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png'
