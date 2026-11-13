@@ -2,7 +2,7 @@
 
 ## État réel du livrable
 
-Ce dossier contient une version PWA installable de l'interface, le portail d'entrée d'administration séparé, un manifeste, un service worker, des icônes, le script SQL Supabase et ce guide. **Le site n'est pas encore déployé et le backend n'est pas encore relié** : aucun URL de projet Supabase, aucune clé publique, aucune adresse e-mail d'administration et aucun domaine/compte d'hébergement n'ont été fournis.
+Ce dossier contient une version PWA installable de l'interface, le portail d'entrée d'administration séparé, un manifeste, un service worker, des icônes, le script SQL Supabase et ce guide. **Le site n'est pas encore déployé.** Le fichier `site/index.html` est maintenant configuré avec le projet Supabase communiqué. La connexion réelle et la création du compte Auth administrateur restent à tester ; le domaine Netlify reste à définir.
 
 L'application ne crée plus de comptes, d'abonnements ni de progression dans le navigateur comme solution de remplacement. Tant que Supabase n'est pas configuré, les formulaires de connexion/inscription signalent que le service est indisponible. C'est intentionnel : éviter des comptes et paiements locaux non partagés et non fiables. La connexion administrateur ne peut pas être testée en direct avant de renseigner l'URL Supabase, la clé publique et l'adresse e-mail autorisée.
 
@@ -18,21 +18,21 @@ L'application ne crée plus de comptes, d'abonnements ni de progression dans le 
 
 1. Créer un projet Supabase et conserver son URL de projet et sa clé publique `anon`/publishable. **Ne jamais mettre une clé `service_role` ou `secret` dans le HTML, le manifeste ou le dépôt public.**
 2. Ouvrir le SQL Editor, sauvegarder les données existantes si le projet n'est pas neuf, puis exécuter `AKADEMIA_supabase_setup.sql`.
-3. Ouvrir `MIGRATION_CONNEXION_ADMIN.sql`, remplacer `VOTRE_ADRESSE_ADMIN` par l'adresse e-mail exacte de l'administrateur, puis exécuter ce script. Cette migration inscrit l'adresse dans une liste privée côté base et adapte le déclencheur d'inscription : seul cet e-mail reçoit le rôle `admin`. Les autres inscriptions restent obligées de fournir une série élève valide.
+3. Exécuter `MIGRATION_CONNEXION_ADMIN.sql` après le script principal. L’adresse `julio7271@gmail.com` est déjà renseignée dans la migration ; ne la remplace pas. Cette migration inscrit l'adresse dans une liste privée côté base et adapte le déclencheur d'inscription : seul cet e-mail reçoit le rôle `admin`. Les autres inscriptions restent obligées de fournir une série élève valide.
 4. **Après la migration**, aller dans Authentication → Users et créer l'utilisateur avec l'adresse autorisée et un mot de passe temporaire. Le déclencheur crée automatiquement son profil `admin` avec `must_change_password = true`. Pour un compte déjà présent dans Auth, la migration le promeut également s'il correspond à l'adresse autorisée.
 5. Dans Authentication → Providers, activer Email et choisir le comportement de confirmation d'adresse souhaité. Pour le compte admin, vérifier que l'adresse est confirmée avant le premier essai de connexion.
 6. Dans Authentication → URL Configuration, définir la Site URL et ajouter les URL de redirection du domaine publié, notamment `https://VOTRE_DOMAINE/` et `https://VOTRE_DOMAINE/index.html` (adapter exactement le domaine).
-7. Dans `index.html`, renseigner les trois valeurs de `SUPABASE_CONFIG` :
+7. La configuration `SUPABASE_CONFIG` a déjà été renseignée dans `index.html` avec les paramètres communiqués. Vérifier qu’elle reste cohérente avec l’adresse inscrite dans la migration :
 
 ```js
 const SUPABASE_CONFIG = {
-  url: 'https://VOTRE-PROJET.supabase.co',
-  anonKey: 'VOTRE_CLE_PUBLIQUE_ANON',
-  adminEmail: 'VOTRE_ADRESSE_ADMIN'
+  url: 'https://dipcfwrxjyowpkrkncrs.supabase.co',
+  anonKey: '[clé publishable déjà renseignée dans le fichier]',
+  adminEmail: 'julio7271@gmail.com'
 };
 ```
 
-La valeur `adminEmail` doit être identique à l'adresse ajoutée dans `MIGRATION_CONNEXION_ADMIN.sql` et au compte Auth créé. L'identifiant visible dans le portail reste `akademia` ; le mot de passe est vérifié par Supabase Auth. Le mot de passe temporaire `210917` peut être utilisé pour le premier accès si le projet accepte cette longueur, mais il doit être remplacé immédiatement par un mot de passe robuste d'au moins 12 caractères. Ne jamais inscrire le mot de passe dans le HTML, le dépôt GitHub, les scripts SQL ou les fichiers publiés.
+La valeur `adminEmail` doit être identique à l’adresse ajoutée dans `MIGRATION_CONNEXION_ADMIN.sql` et au compte Auth créé. L'identifiant visible dans le portail reste `akademia` ; le mot de passe est vérifié par Supabase Auth. Le mot de passe temporaire doit être défini directement dans Supabase Auth et remplacé lors du premier accès par un mot de passe robuste d'au moins 12 caractères. Ne jamais inscrire le mot de passe dans le HTML, le dépôt GitHub, les scripts SQL ou les fichiers publiés.
 
 **Contrôle de sécurité à la connexion :** après authentification, l'application lit le profil dans `public.profiles`, impose le changement du mot de passe initial, puis appelle `rpc('is_admin')` côté serveur avant d'afficher le tableau de bord. Les autorisations réelles des données restent imposées par les politiques RLS ; le contrôle JavaScript n'est qu'une vérification supplémentaire.
 
@@ -51,7 +51,7 @@ from auth.users u
 left join public.profiles p on p.id = u.id
 left join public.akademia_admin_allowlist a
   on a.email = lower(trim(u.email))
-where lower(u.email) = lower('VOTRE_ADRESSE_ADMIN');
+where lower(u.email) = lower('julio7271@gmail.com');
 ```
 
 Avant le changement de mot de passe, le résultat attendu est `role = admin`, `series = Administrateur`, `must_change_password = true`, `adresse_admin_autorisee = true`. Après le changement, `must_change_password` doit devenir `false`. Le compte ne doit accéder au tableau de bord que dans ce dernier état.

@@ -11,15 +11,15 @@ Le contrôle du code local est terminé :
 - juste avant l'ouverture du tableau de bord, l'application vérifie `rpc('is_admin')` ;
 - en cas d'échec du contrôle administrateur, la session est fermée et le tableau de bord reste masqué.
 
-**Le test réel du serveur Supabase n'est pas encore effectué.** Le fichier `index.html` contient encore les valeurs de configuration provisoires (`VOTRE-PROJET`, clé publique et e-mail admin). Aucun projet Supabase ni compte administrateur réel n'est connecté à ce paquet.
+**Le test réel du serveur Supabase n'est pas encore effectué.** Le fichier `site/index.html` est maintenant renseigné avec le Project URL, la clé publishable fournie et l’adresse administrateur `julio7271@gmail.com`. Il reste à créer/vérifier le compte Auth et à effectuer les essais de connexion.
 
 ## Mise en service du compte admin
 
 1. Exécuter `AKADEMIA_supabase_setup.sql` dans Supabase SQL Editor.
-2. Dans `MIGRATION_CONNEXION_ADMIN.sql`, remplacer `VOTRE_ADRESSE_ADMIN` par l'adresse e-mail exacte. Exécuter ensuite la migration.
+2. Exécuter `02_MIGRATION_CONNEXION_ADMIN.sql` après le script principal. L’adresse `julio7271@gmail.com` est déjà intégrée à la migration.
 3. Après la migration, créer l'utilisateur correspondant dans Authentication → Users avec un mot de passe temporaire. La liste d'autorisation privée permet au trigger de créer directement un profil `admin`; aucune série élève factice ni métadonnée `role=admin` n'est utilisée.
 4. Si le compte Auth existait déjà, la migration promeut le profil correspondant à l'adresse autorisée et impose le changement de mot de passe.
-5. Dans `index.html`, remplacer `url`, `anonKey` et `adminEmail` dans `SUPABASE_CONFIG`. Utiliser seulement la clé publique `anon`/publishable. **Ne jamais utiliser ou publier la clé `service_role`/secret.**
+5. La configuration de `site/index.html` est déjà renseignée. La clé publishable est destinée au navigateur ; elle ne remplace pas les politiques RLS. **Ne jamais utiliser ou publier la clé `service_role`/secret.**
 6. Publier le site en HTTPS, puis ouvrir `/administration.html`.
 
 ## Scénario de test positif
@@ -53,11 +53,11 @@ from auth.users u
 left join public.profiles p on p.id = u.id
 left join public.akademia_admin_allowlist a
   on a.email = lower(trim(u.email))
-where lower(u.email) = lower('VOTRE_ADRESSE_ADMIN');
+where lower(u.email) = lower('julio7271@gmail.com');
 ```
 
 Résultat attendu après provisionnement : `role = admin`, `series = Administrateur`, `must_change_password = true`, `adresse_admin_autorisee = true`. Après le changement initial du mot de passe, `must_change_password` doit être `false`.
 
 ## Informations nécessaires pour un test réel accompagné
 
-Il faut d'abord le Project URL Supabase, la clé publique anon/publishable et l'adresse e-mail du compte admin. L'administrateur saisira lui-même son mot de passe dans le portail ; il ne faut pas l'envoyer dans la conversation. Ne jamais communiquer la clé `service_role`/secret.
+Le Project URL, la clé publishable et l’adresse e-mail administrateur sont maintenant renseignés dans le fichier web. L'administrateur saisira lui-même son mot de passe dans le portail ; il ne faut pas l'envoyer dans la conversation. Ne jamais communiquer la clé `service_role`/secret.
