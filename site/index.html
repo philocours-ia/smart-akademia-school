@@ -75,6 +75,7 @@
         body.admin-mode #app-shell > footer,
         body.admin-mode #app-shell > nav { display: none !important; }
         body.admin-mode #app-shell main { max-width: 100%; padding: 1rem; }
+        body.admin-mode #app-back-control { display: none !important; }
         body.admin-mode #app-shell main > .view-section:not(#view-admin) { display: none !important; }
         body.admin-mode #view-admin { display: block !important; }
         .pwa-install-note { padding: .8rem 1rem; border: 1px solid #e2d7ae; border-radius: .9rem; background: #fffbeb; color: #713f12; font-size: .75rem; line-height: 1.5; }
@@ -255,6 +256,16 @@
 
     <!-- CONTENU PRINCIPAL -->
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-5">
+
+        <!-- Navigation transversale : retour à la rubrique précédente -->
+        <div id="app-back-control" class="hidden mb-4 flex items-center justify-between gap-3" aria-live="polite">
+            <button id="app-back-button" type="button" onclick="goBackInApp()"
+                class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-navy-900 shadow-sm transition hover:border-gold-500 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:ring-offset-2"
+                aria-label="Revenir à la rubrique précédente">
+                <i class="fas fa-arrow-left" aria-hidden="true"></i><span>Retour</span>
+            </button>
+            <span id="app-back-hint" class="text-right text-xs text-slate-500"></span>
+        </div>
 
         <!-- ==================== 1. ONGLET ACCUEIL ==================== -->
         <section id="view-accueil" class="view-section fade-in space-y-6">
@@ -987,6 +998,7 @@
             renderAdminLists();
             loadCloudCitations();
             loadForumData();
+            resetAppNavigation('admin');
             switchTab('admin');
         }
 
@@ -3001,6 +3013,78 @@
             currentChapterTitle: ""
         };
 
+        // Historique des rubriques de l'application (bouton Retour + bouton Précédent du navigateur/téléphone).
+        let appNavigationStack = [];
+        let appNavigationSessionId = '';
+
+        const APP_TAB_LABELS = {
+            accueil: 'Accueil', suivi: 'Mon suivi', cours: 'Cours', citations: 'Boky Citation',
+            bibliotheque: 'Bibliothèque', exercices: 'Exercices & Devoirs', forum: 'Forum Débat',
+            messagerie: 'Assistance Prof', apropos: 'Qui sommes-nous ?', admin: 'Administration'
+        };
+
+        function resetAppNavigation(initialTab) {
+            appNavigationSessionId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                ? window.crypto.randomUUID()
+                : `sas-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            appNavigationStack = [initialTab];
+            state.currentTab = initialTab;
+            try {
+                window.history.replaceState({
+                    smartAkademiaApp: true, smartAkademiaSession: appNavigationSessionId, smartAkademiaTab: initialTab
+                }, '', window.location.href);
+            } catch (error) { console.warn('Historique de navigation indisponible :', error); }
+            updateAppBackControl();
+        }
+
+        function updateAppBackControl() {
+            const row = document.getElementById('app-back-control');
+            const hint = document.getElementById('app-back-hint');
+            if (!row) return;
+            const visible = !state.isAdmin && !!state.currentUser && state.currentTab !== 'accueil';
+            row.classList.toggle('hidden', !visible);
+            if (hint) {
+                const previousTab = appNavigationStack.length > 1
+                    ? appNavigationStack[appNavigationStack.length - 2] : 'accueil';
+                hint.textContent = visible ? `Retour vers : ${APP_TAB_LABELS[previousTab] || 'Accueil'}` : '';
+            }
+        }
+
+        function goBackInApp() {
+            if (state.isAdmin) return;
+            if (appNavigationStack.length > 1) {
+                const currentHistoryState = window.history.state;
+                if (currentHistoryState?.smartAkademiaApp
+                    && currentHistoryState.smartAkademiaSession === appNavigationSessionId) {
+                    window.history.back();
+                    return;
+                }
+                const previousTab = appNavigationStack[appNavigationStack.length - 2];
+                appNavigationStack.pop();
+                switchTab(previousTab, { fromPopState: true });
+                return;
+            }
+            if (state.currentTab !== 'accueil') {
+                switchTab('accueil');
+                return;
+            }
+            showToast('Vous êtes déjà sur la page d’accueil.', 'info');
+        }
+
+        window.addEventListener('popstate', event => {
+            const app = document.getElementById('app-shell');
+            if (!app || app.classList.contains('hidden') || !state.currentUser) return;
+            // L'espace administrateur est un tableau de bord autonome ; le retour navigateur
+            // ne doit jamais basculer vers l'espace élève.
+            if (state.isAdmin) return;
+            const targetTab = event.state?.smartAkademiaApp
+                && event.state.smartAkademiaSession === appNavigationSessionId
+                ? event.state.smartAkademiaTab : null;
+            if (targetTab && document.getElementById(`view-${targetTab}`)) {
+                switchTab(targetTab, { fromPopState: true });
+            }
+        });
+
         // Migration des anciennes catégories vers les quatre thématiques du PE T12.
         const CITATION_THEME_MIGRATION = {
             "Lohahevitra I : Ny filôzôfia": "Thématique I : Caractéristiques de la philosophie",
@@ -3119,6 +3203,7 @@
             await loadStudentProgress();
             if (supabaseClient) await Promise.all([loadStudentMessages(), loadCloudCitations(), loadForumData()]);
             applyAdminControls();
+            resetAppNavigation('accueil');
             switchTab('accueil');
         }
 
@@ -3232,6 +3317,8 @@
             }
             state.currentUser = null;
             state.isAdmin = false;
+            appNavigationStack = [];
+            appNavigationSessionId = '';
             document.body.classList.remove('admin-mode');
             document.getElementById('admin-password-change-screen').classList.add('hidden');
             document.getElementById('app-shell').classList.add('hidden');
@@ -3260,10 +3347,24 @@
             setTimeout(() => toast.remove(), 4000);
         }
 
-        function switchTab(tabId) {
+        function switchTab(tabId, options = {}) {
             if (tabId === 'admin' && !state.isAdmin) {
                 showToast('Accès réservé à l’administration.', 'error');
                 return;
+            }
+            const previousTab = state.currentTab;
+            if (options.fromPopState) {
+                const existingIndex = appNavigationStack.lastIndexOf(tabId);
+                if (existingIndex >= 0) appNavigationStack = appNavigationStack.slice(0, existingIndex + 1);
+                else appNavigationStack.push(tabId);
+            } else if (previousTab !== tabId && state.currentUser && appNavigationSessionId) {
+                if (!appNavigationStack.length) appNavigationStack = [previousTab || 'accueil'];
+                appNavigationStack.push(tabId);
+                try {
+                    window.history.pushState({
+                        smartAkademiaApp: true, smartAkademiaSession: appNavigationSessionId, smartAkademiaTab: tabId
+                    }, '', window.location.href);
+                } catch (error) { console.warn('Historique de navigation indisponible :', error); }
             }
             state.currentTab = tabId;
             if (tabId === 'cours') renderCourses();
@@ -3291,6 +3392,7 @@
                 }
             });
 
+            updateAppBackControl();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -3935,6 +4037,8 @@
             if (supabaseClient) await supabaseClient.auth.signOut();
             state.isAdmin = false;
             state.currentUser = null;
+            appNavigationStack = [];
+            appNavigationSessionId = '';
             document.body.classList.remove('admin-mode');
             document.getElementById('admin-password-change-screen').classList.add('hidden');
             document.getElementById('app-shell').classList.add('hidden');
