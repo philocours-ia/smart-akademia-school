@@ -17,3 +17,7 @@
 /administration.html
   Cache-Control: no-cache
   X-Robots-Tag: noindex, nofollow
+
+/role-portal.js
+  Cache-Control: no-cache
+

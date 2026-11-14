@@ -38,3 +38,7 @@ Ce correctif ne demande pas de nouvelle migration SQL. Il utilise les tables et 
 - Vérification du manifeste et de la structure de publication inchangés.
 
 Les tests de connexion, RLS et Storage réels doivent être exécutés sur le projet Supabase du propriétaire.
+
+## Correctif du portail partenaire (v15)
+
+Consulter `docs/CORRECTIF_ESPACES_PARTENAIRES_ET_DIAGNOSTIC_PORTAILS_2026-11-14.md`. Il n'ajoute pas de migration SQL ; il rend le portail partenaire tolérant aux erreurs partielles et affiche les diagnostics des autres portails.

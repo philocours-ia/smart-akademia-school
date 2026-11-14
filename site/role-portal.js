@@ -265,15 +265,24 @@ function roleBadge(role) {
 async function renderRolePortal() {
     const user = state.currentUser;
     if (!user) return;
-    document.getElementById('role-portal-title').textContent = roleBadge(user.role);
-    document.getElementById('role-portal-subtitle').textContent = `${user.name || user.email} • ${user.email}`;
+    const title = document.getElementById('role-portal-title');
+    const subtitle = document.getElementById('role-portal-subtitle');
     const host = document.getElementById('role-portal-content');
+    if (!host) return;
+    if (title) title.textContent = roleBadge(user.role);
+    if (subtitle) subtitle.textContent = `${user.name || user.email} • ${user.email || ''}`;
     host.innerHTML = '<div class="bg-white rounded-2xl p-6 text-sm text-slate-500">Chargement sécurisé de votre espace…</div>';
-    if (user.role === 'student' && user.registrationStatus !== 'approved') return renderStudentEnrollmentWorkspace(host, user);
-    if (user.role === 'applicant') return renderApplicantWorkspace(host, user);
-    if (user.role === 'teacher') return renderTeacherWorkspace(host, user);
-    if (user.role === 'partner') return renderPartnerWorkspace(host, user);
-    if (user.role === 'promoter') return renderPromoterWorkspace(host, user);
+    try {
+        if (user.role === 'student' && user.registrationStatus !== 'approved') return await renderStudentEnrollmentWorkspace(host, user);
+        if (user.role === 'applicant') return await renderApplicantWorkspace(host, user);
+        if (user.role === 'teacher') return await renderTeacherWorkspace(host, user);
+        if (user.role === 'partner') return await renderPartnerWorkspace(host, user);
+        if (user.role === 'promoter') return await renderPromoterWorkspace(host, user);
+        host.innerHTML = `<section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900 space-y-2"><strong>Votre espace n’est pas associé à un profil reconnu.</strong><p>Rôle reçu : ${escapeHtml(user.role || 'non renseigné')}. Contactez l’administration pour vérifier votre profil.</p><button onclick="logoutRolePortal()" class="rounded-lg border px-3 py-2 text-xs font-bold">Retour à la connexion</button></section>`;
+    } catch (error) {
+        console.error('Chargement de l’espace Smart Akademia :', error);
+        host.innerHTML = `<section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-950 space-y-3"><strong>Le chargement de votre espace a rencontré une erreur inattendue.</strong><p class="text-xs">La session reste ouverte. Vous pouvez réessayer sans créer un autre compte.</p><details class="rounded-lg border border-rose-200 bg-white p-3"><summary class="cursor-pointer text-xs font-bold">Détail technique</summary><p class="mt-2 text-xs break-words">${escapeHtml(error?.message || String(error))}</p></details><button type="button" onclick="refreshRolePortal()" class="rounded-lg bg-navy-900 text-gold-400 px-4 py-2 text-xs font-bold">Réessayer</button></section>`;
+    }
 }
 
 async function renderStudentEnrollmentWorkspace(host, user) {
@@ -407,7 +416,14 @@ async function renderApplicantWorkspace(host, user) {
 }
 
 function roleMigrationNotice(error) {
-    return `<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-900"><strong>Le module professionnel n’est pas encore installé dans Supabase.</strong><p class="mt-2">Exécutez la migration 06 après les migrations 01, 02, 03 et 05. Détail technique : ${escapeHtml(error?.message || 'tables non disponibles')}.</p></div>`;
+    const message = error?.message || 'Le serveur n’a pas renvoyé de détail.';
+    const code = error?.code ? ` (${error.code})` : '';
+    return `<section class="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-950 space-y-3">
+      <div><strong>Une partie de votre espace n’a pas pu être chargée.</strong><p class="mt-1 text-xs">Vos droits ne sont pas élargis et aucune donnée n’a été modifiée. Il peut s’agir d’une table, d’une fonction RPC, d’une règle RLS ou d’une migration manquante.</p></div>
+      <details class="rounded-lg border border-amber-300 bg-white/70 p-3"><summary class="cursor-pointer text-xs font-bold">Afficher le diagnostic technique</summary><p class="mt-2 text-xs break-words">${escapeHtml(message + code)}</p></details>
+      <button type="button" onclick="refreshRolePortal()" class="rounded-lg bg-navy-900 text-gold-400 px-4 py-2 text-xs font-bold">Réessayer le chargement</button>
+      <p class="text-[10px] text-amber-900">Ne relancez pas les anciennes migrations au hasard. Transmettez le message technique à l’administrateur technique pour corriger uniquement le point défaillant.</p>
+    </section>`;
 }
 
 function validatePrivateFile(file, maxBytes, types) {
@@ -633,50 +649,110 @@ async function submitTeacherResource(e) {
 }
 
 async function renderPartnerWorkspace(host, user) {
-    const [m, c] = await Promise.all([
-        supabaseClient.from('partner_memberships').select('*').eq('user_id', user.id).maybeSingle(),
-        supabaseClient.from('partner_contributions').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    // Chaque bloc est chargé indépendamment : une erreur d'accès aux cotisations
+    // ne doit plus effacer l'ensemble de l'espace partenaire.
+    const [membershipResult, contributionResult, applicationResult] = await Promise.all([
+        supabaseClient.from('partner_memberships')
+            .select('user_id,access_ticket,ticket_valid_until,contribution_expires_at,updated_at')
+            .eq('user_id', user.id).maybeSingle(),
+        supabaseClient.from('partner_contributions')
+            .select('id,amount_ar,payment_method,payment_reference,transaction_reference,proof_path,status,reviewed_at,created_at')
+            .eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabaseClient.from('role_applications')
+            .select('id,application_type,status,organization_name,applicant_name,applicant_email,phone,monthly_commitment_accepted,documents,review_note,created_at')
+            .eq('user_id', user.id).eq('application_type', 'partner')
+            .order('created_at', { ascending: false }).limit(1)
     ]);
-    const error = m.error || c.error;
-    if (error) { host.innerHTML = roleMigrationNotice(error); return; }
-    const membership = m.data;
-    const contributions = c.data || [];
-    const active = membership && new Date(membership.contribution_expires_at).getTime() > Date.now() && new Date(`${membership.ticket_valid_until}T23:59:59`).getTime() > Date.now();
-    host.innerHTML = `<div class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Statut partenaire</h2>
-      <p class="text-sm ${active?'text-emerald-700':'text-amber-700'} font-semibold">${active?'Cotisation active':'Aucune cotisation partenaire active'}</p>
-      ${membership?`<div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4"><p class="text-xs text-emerald-800">Ticket partenaire à six chiffres (code secondaire, non utilisable à la place de votre mot de passe Supabase)</p><p class="font-mono text-3xl font-bold tracking-[.3em] text-emerald-900 mt-2">${escapeHtml(membership.access_ticket)}</p><p class="text-xs text-emerald-800 mt-2">Valide jusqu’au ${new Date(`${membership.ticket_valid_until}T00:00:00`).toLocaleDateString('fr-FR')} • Cotisation active jusqu’au ${new Date(membership.contribution_expires_at).toLocaleDateString('fr-FR')}</p></div>`:''}
-      <p class="text-xs text-slate-500">Le ticket annuel n’est qu’un identifiant de membre. La connexion et les permissions restent protégées par Supabase Auth et les politiques RLS.</p></div>
-      <div class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Déclarer la cotisation mensuelle de 100 000 Ar</h2>
-        <p class="text-xs text-slate-600">MVola : <strong>0385528349 — Nasandratriniaina Julio</strong> • Binance Pay : <strong>820751129</strong> • Référence obligatoire : <strong>FINANCEMENT</strong>. Le paiement est vérifié manuellement.</p>
-        <form onsubmit="submitPartnerContribution(event)" class="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <select id="partner-payment-method" class="auth-input"><option>MVola</option><option>Binance Pay</option></select>
-          <input id="partner-transaction-reference" required maxlength="120" class="auth-input" placeholder="Référence de transaction">
-          <input value="100 000 Ar" readonly class="auth-input bg-slate-50"><input value="FINANCEMENT" readonly class="auth-input bg-slate-50 font-mono">
-          <input id="partner-payment-proof" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input md:col-span-2"><button class="md:col-span-2 rounded-xl bg-navy-900 text-gold-400 px-4 py-3 text-xs font-bold">Envoyer la preuve de cotisation</button>
-        </form>
-      </div>
-      <div class="bg-white rounded-2xl border p-5"><h2 class="font-bold text-navy-900 mb-3">Historique des cotisations</h2>${contributions.length?contributions.map(x=>`<p class="text-xs bg-slate-50 rounded-lg p-2 mb-2">100 000 Ar • ${escapeHtml(x.payment_method)} • ${escapeHtml(x.status)} • ${new Date(x.created_at).toLocaleDateString('fr-FR')}</p>`).join(''):'<p class="text-xs text-slate-500">Aucun paiement soumis.</p>'}</div>
-      <div class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Consultation et audit des cours</h2><div id="partner-audit-courses" class="space-y-2"><p class="text-xs text-slate-500">Chargement des ressources disponibles…</p></div></div>
+
+    const membership = membershipResult.error ? null : membershipResult.data;
+    const contributions = contributionResult.error ? [] : (contributionResult.data || []);
+    const application = applicationResult.error ? null : (applicationResult.data || [])[0] || null;
+    const now = Date.now();
+    const contributionExpiry = membership?.contribution_expires_at ? new Date(membership.contribution_expires_at).getTime() : 0;
+    const ticketExpiry = membership?.ticket_valid_until ? new Date(`${membership.ticket_valid_until}T23:59:59`).getTime() : 0;
+    const active = !!membership && contributionExpiry > now && ticketExpiry > now;
+    const pendingContribution = contributions.find(x => x.status === 'pending');
+    const initialProof = Array.isArray(application?.documents) ? application.documents.find(d => d?.kind === 'payment_proof' && d?.path) : null;
+    const initialProofAlreadyInLedger = !!initialProof && contributions.some(x => x.proof_path === initialProof.path);
+
+    const errorCard = (label, error) => error ? `<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950"><strong>${escapeHtml(label)} : lecture impossible.</strong><p class="mt-1 break-words">${escapeHtml(error.message || 'Erreur Supabase sans détail.')}${error.code ? ` (${escapeHtml(error.code)})` : ''}</p></div>` : '';
+    const dateLabel = value => value ? new Date(value).toLocaleString('fr-FR') : 'Non renseignée';
+
+    const contributionRows = [];
+    for (const item of contributions) {
+        let proofLink = '<span class="text-[10px] text-rose-700">Justificatif non consultable.</span>';
+        if (item.proof_path) {
+            const signed = await supabaseClient.storage.from('partner-payment-proofs').createSignedUrl(item.proof_path, 900);
+            if (signed.data?.signedUrl) proofLink = `<a class="text-[11px] underline font-bold text-indigo-700" target="_blank" rel="noopener noreferrer" href="${escapeHtml(signed.data.signedUrl)}">Consulter mon justificatif</a>`;
+            else if (signed.error) proofLink = `<span class="text-[10px] text-rose-700">Justificatif non consultable : ${escapeHtml(signed.error.message || 'accès Storage refusé')}.</span>`;
+        }
+        const statusLabel = item.status === 'approved' ? 'Validée' : item.status === 'rejected' ? 'Refusée' : 'En attente';
+        const statusStyle = item.status === 'approved' ? 'text-emerald-700 bg-emerald-50' : item.status === 'rejected' ? 'text-rose-700 bg-rose-50' : 'text-amber-800 bg-amber-50';
+        contributionRows.push(`<article class="rounded-lg border p-3 space-y-1"><div class="flex flex-wrap justify-between gap-2"><strong class="text-xs">${Number(item.amount_ar || 0).toLocaleString('fr-FR')} Ar • ${escapeHtml(item.payment_method || 'Mode inconnu')}</strong><span class="rounded-full px-2 py-1 text-[10px] font-bold ${statusStyle}">${statusLabel}</span></div><p class="text-[11px] text-slate-600">Référence : ${escapeHtml(item.payment_reference || 'Non renseignée')} • Transaction : ${escapeHtml(item.transaction_reference || 'Non renseignée')}</p><p class="text-[10px] text-slate-500">Déposée : ${dateLabel(item.created_at)}${item.reviewed_at ? ` • Examinée : ${dateLabel(item.reviewed_at)}` : ''}</p>${proofLink}</article>`);
+    }
+
+    let initialProofHtml = '';
+    if (initialProof && !initialProofAlreadyInLedger) {
+        const signed = await supabaseClient.storage.from('partner-payment-proofs').createSignedUrl(initialProof.path, 900);
+        initialProofHtml = `<div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-950 space-y-1"><strong>Preuve de la première cotisation jointe à votre candidature</strong><p>Montant déclaré : ${Number(initialProof.amount_ar || 100000).toLocaleString('fr-FR')} Ar • ${escapeHtml(initialProof.payment_method || 'Mode non renseigné')} • référence ${escapeHtml(initialProof.payment_reference || 'FINANCEMENT')}.</p><p>Transaction : ${escapeHtml(initialProof.transaction_reference || 'Non renseignée')}</p>${signed.data?.signedUrl ? `<a class="underline font-bold" target="_blank" rel="noopener noreferrer" href="${escapeHtml(signed.data.signedUrl)}">Consulter la preuve initiale</a>` : '<p class="text-rose-700">Le fichier existe dans le dossier de candidature mais le lien privé ne peut pas être généré.</p>'}<p class="font-semibold">Cette preuve ne doit pas être payée une seconde fois. Si elle n’apparaît pas dans l’historique des cotisations, l’administration doit vérifier la migration 10.</p></div>`;
+    }
+
+    let statusTitle = 'Aucune cotisation partenaire active';
+    let statusCopy = 'Votre compte partenaire est reconnu. La consultation des cours sera ouverte après validation de la première cotisation et création de votre ticket.';
+    let statusStyle = 'text-amber-800';
+    if (active) {
+        statusTitle = 'Cotisation active'; statusCopy = `Cotisation valide jusqu’au ${dateLabel(membership.contribution_expires_at)}. Ticket annuel valide jusqu’au ${dateLabel(membership.ticket_valid_until)}.`; statusStyle = 'text-emerald-700';
+    } else if (pendingContribution) {
+        statusTitle = 'Première cotisation en attente de vérification'; statusCopy = 'Votre justificatif a été transmis. Attendez le contrôle manuel de l’administration avant tout nouveau versement.';
+    } else if (application?.status === 'approved' && initialProof && !initialProofAlreadyInLedger) {
+        statusTitle = 'Candidature approuvée — cotisation à rapprocher'; statusCopy = 'La preuve initiale est jointe au dossier, mais aucune ligne correspondante n’a été trouvée dans l’historique des cotisations. Ne payez pas une seconde fois : demandez à l’administration de vérifier la migration 10.';
+    } else if (membership) {
+        statusTitle = 'Cotisation ou ticket expiré'; statusCopy = 'Votre compte reste actif, mais l’accès partenaire aux cours est suspendu jusqu’à validation du renouvellement.';
+    }
+
+    const applicationPanel = application ? `<div class="rounded-xl border bg-white p-4 space-y-1"><h3 class="font-bold text-sm text-navy-900">Votre candidature partenaire</h3><p class="text-xs text-slate-700">Organisme / partenaire : <strong>${escapeHtml(application.organization_name || application.applicant_name || user.name || 'Non renseigné')}</strong></p><p class="text-xs text-slate-700">Statut : <strong>${escapeHtml(application.status === 'approved' ? 'Approuvée' : application.status === 'rejected' ? 'Refusée' : 'En attente')}</strong> • Déposée le ${dateLabel(application.created_at)}</p><p class="text-xs text-slate-700">Engagement mensuel de 100 000 Ar : <strong>${application.monthly_commitment_accepted ? 'Accepté' : 'Non confirmé'}</strong></p>${application.review_note ? `<p class="rounded-lg bg-slate-50 p-2 text-xs">Note de l’administration : ${escapeHtml(application.review_note)}</p>` : ''}</div>` : '';
+
+    const showContributionForm = !membershipResult.error && !contributionResult.error && !applicationResult.error && !pendingContribution && !(application?.status === 'approved' && initialProof && !initialProofAlreadyInLedger);
+    host.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-2"><div><p class="text-[10px] font-bold uppercase tracking-widest text-gold-600">Tableau de bord partenaire</p><h2 class="font-display text-xl font-bold text-navy-900">Bienvenue ${escapeHtml(user.name || application?.organization_name || 'partenaire')}</h2><p class="text-xs text-slate-500">${escapeHtml(user.email || '')}</p></div><button type="button" onclick="refreshRolePortal()" class="rounded-lg border px-3 py-2 text-xs font-bold">Actualiser mon espace</button></div>
+      ${applicationPanel}
+      <section class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Statut de votre partenariat</h2><p class="text-sm ${statusStyle} font-semibold">${escapeHtml(statusTitle)}</p><p class="text-xs text-slate-600">${escapeHtml(statusCopy)}</p>${membership ? `<div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4"><p class="text-xs text-emerald-900">Votre ticket partenaire à six chiffres (identifiant secondaire, jamais un mot de passe)</p><p class="font-mono text-3xl font-bold tracking-[.3em] text-emerald-950 mt-2">${escapeHtml(membership.access_ticket)}</p><p class="text-xs text-emerald-800 mt-2">Fin du ticket : ${dateLabel(membership.ticket_valid_until)} • Cotisation jusqu’au : ${dateLabel(membership.contribution_expires_at)}</p></div>` : '<p class="text-xs text-slate-500">Aucun ticket ne sera affiché avant validation administrative de la cotisation.</p>'}</section>
+      ${errorCard('Lecture du statut partenaire', membershipResult.error)}
+      <section class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Cotisation mensuelle : 100 000 Ar</h2><p class="text-xs text-slate-600">MVola : <strong>0385528349 — Nasandratriniaina Julio</strong> • Binance Pay : <strong>820751129</strong> • Référence obligatoire : <strong>FINANCEMENT</strong>. Tout paiement est contrôlé manuellement.</p>${errorCard('Historique des cotisations', contributionResult.error)}${pendingContribution ? '<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950"><strong>Un paiement est déjà en attente.</strong> N’effectuez pas un second versement avant la décision administrative.</div>' : ''}${(!showContributionForm && !pendingContribution && !initialProofHtml) ? '<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">Le système ne peut pas confirmer tout l’historique de votre compte. L’envoi d’un nouveau paiement est suspendu pour éviter un double versement. Actualisez la page ou contactez l’administration.</div>' : ''}${initialProofHtml}${showContributionForm ? `<form onsubmit="submitPartnerContribution(event)" class="grid grid-cols-1 md:grid-cols-2 gap-2"><label class="text-xs font-semibold">Mode de paiement<select id="partner-payment-method" required class="auth-input mt-1"><option value="MVola">MVola</option><option value="Binance Pay">Binance Pay</option></select></label><label class="text-xs font-semibold">Référence de transaction<input id="partner-transaction-reference" required minlength="3" maxlength="120" class="auth-input mt-1" placeholder="Référence du reçu"></label><input value="100 000 Ar" readonly class="auth-input bg-slate-50"><input value="FINANCEMENT" readonly class="auth-input bg-slate-50 font-mono"><label class="md:col-span-2 text-xs font-semibold">Preuve de paiement<input id="partner-payment-proof" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input mt-1"></label><button class="md:col-span-2 rounded-xl bg-navy-900 text-gold-400 px-4 py-3 text-xs font-bold">Envoyer la preuve de cotisation</button></form>` : ''}</section>
+      <section class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Historique des cotisations</h2>${contributionResult.error ? '<p class="text-xs text-slate-500">Historique non disponible tant que l’erreur ci-dessus n’est pas corrigée.</p>' : contributionRows.length ? contributionRows.join('') : '<p class="text-xs text-slate-500">Aucun paiement enregistré pour le moment.</p>'}</section>
+      ${errorCard('Votre dossier de candidature', applicationResult.error)}
+      <section class="bg-white rounded-2xl border p-5 space-y-3"><h2 class="font-bold text-navy-900">Consultation et audit des cours</h2><div id="partner-audit-courses" class="space-y-2"><p class="text-xs text-slate-500">${active ? 'Chargement des ressources disponibles…' : 'Accès aux cours conditionné par une cotisation active et un ticket annuel valide.'}</p></div></section>
       ${professionalMessagingMarkup()}`;
+
+    const auditHost = document.getElementById('partner-audit-courses');
     if (active) await renderPartnerAuditCourses();
-    else document.getElementById('partner-audit-courses').innerHTML='<p class="text-xs text-amber-800">La consultation des cours exige une cotisation mensuelle active et un ticket annuel valide.</p>';
+    else if (auditHost) auditHost.innerHTML = '<p class="text-xs text-amber-800">La consultation des cours est actuellement verrouillée. Le tableau de bord et les justificatifs restent consultables.</p>';
     await loadProfessionalMessages();
 }
 
 async function submitPartnerContribution(e) {
     e.preventDefault();
     const user = state.currentUser;
+    if (!user?.id || user.role !== 'partner') return showToast('Le profil partenaire n’est pas confirmé par Supabase. Reconnectez-vous.', 'error');
+    let uploadedPath = null;
     try {
-        const file = document.getElementById('partner-payment-proof').files[0];
-        const path = await uploadRoleFile('partner-payment-proofs', user.id, file, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+        const file = document.getElementById('partner-payment-proof')?.files?.[0];
+        const method = document.getElementById('partner-payment-method')?.value;
+        const transactionReference = document.getElementById('partner-transaction-reference')?.value.trim();
+        if (!['MVola','Binance Pay'].includes(method)) throw new Error('Choisissez MVola ou Binance Pay.');
+        if (!transactionReference || transactionReference.length < 3) throw new Error('La référence de transaction est obligatoire.');
+        uploadedPath = await uploadRoleFile('partner-payment-proofs', user.id, file, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']);
         const { error } = await supabaseClient.from('partner_contributions').insert({
-            user_id: user.id, amount_ar: 100000, payment_method: document.getElementById('partner-payment-method').value,
-            payment_reference: 'FINANCEMENT', transaction_reference: document.getElementById('partner-transaction-reference').value.trim(), proof_path: path
+            user_id: user.id, amount_ar: 100000, payment_method: method,
+            payment_reference: 'FINANCEMENT', transaction_reference: transactionReference, proof_path: uploadedPath
         });
         if (error) throw error;
         showToast('Justificatif transmis. Il sera contrôlé par l’administration.', 'success');
         await renderRolePortal();
-    } catch (error) { showToast(error.message || 'Impossible de transmettre la cotisation.', 'error'); }
+    } catch (error) {
+        // Si l'écriture de la ligne échoue après le téléversement, la preuve orpheline est supprimée.
+        if (uploadedPath) await supabaseClient.storage.from('partner-payment-proofs').remove([uploadedPath]).catch(() => {});
+        showToast(error.message || 'Impossible de transmettre la cotisation.', 'error');
+    }
 }
 
 async function renderPromoterWorkspace(host, user) {
