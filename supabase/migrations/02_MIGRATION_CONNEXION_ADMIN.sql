@@ -1,6 +1,6 @@
 -- SMART AKADEMIA SCHOOL — Provisionnement administrateur sécurisé
 -- À exécuter APRÈS AKADEMIA_supabase_setup.sql et AVANT de créer le compte Auth admin.
--- Remplacer chaque occurrence de VOTRE_ADRESSE_ADMIN par l'adresse e-mail exacte.
+-- Adresse administrateur déjà renseignée : julio7271@gmail.com.
 -- Aucun mot de passe ni clé secrète ne doit être placé dans ce fichier.
 
 begin;
@@ -28,7 +28,7 @@ revoke all on table public.akademia_admin_allowlist from public, anon, authentic
 
 -- Autoriser explicitement l'adresse du propriétaire avant la création de son compte Auth.
 insert into public.akademia_admin_allowlist(email, enabled)
-values (lower(trim('VOTRE_ADRESSE_ADMIN')), true)
+values (lower(trim('julio7271@gmail.com')), true)
 on conflict (email) do update set enabled = true;
 
 -- À la création Auth, seul un e-mail inscrit dans la liste privée reçoit le rôle admin.
