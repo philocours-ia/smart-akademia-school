@@ -105,9 +105,9 @@
                     <div><p class="font-display font-bold text-navy-900">SMART AKADEMIA SCHOOL</p><p class="text-[11px] text-slate-500">Lycée numérique • Madagascar</p></div>
                 </div>
                 <div class="mb-6">
-                    <p class="text-xs font-bold uppercase tracking-widest text-gold-600">Espace élève</p>
+                    <p class="text-xs font-bold uppercase tracking-widest text-gold-600">Accès à la plateforme</p>
                     <h2 id="auth-heading" class="font-display text-2xl font-bold text-navy-900 mt-1">Connexion</h2>
-                    <p id="auth-subheading" class="text-sm text-slate-500 mt-2">Connectez-vous pour accéder à votre espace d'apprentissage.</p>
+                    <p id="auth-subheading" class="text-sm text-slate-500 mt-2">Un seul accès pour tous les profils : élève, enseignant, partenaire, promoteur et administration.</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 mb-6">
@@ -116,7 +116,7 @@
                 </div>
 
                 <form id="auth-login-panel" class="auth-panel space-y-4" onsubmit="handleStudentLogin(event)">
-                    <div><label for="login-email" class="block text-xs font-bold text-slate-700 mb-1.5">Adresse e-mail</label><input id="login-email" type="email" required autocomplete="email" placeholder="nom@exemple.com" class="auth-input"></div>
+                    <div><label for="login-email" class="block text-xs font-bold text-slate-700 mb-1.5">Adresse e-mail ou identifiant</label><input id="login-email" type="text" required autocomplete="username" placeholder="nom@exemple.com — administrateur : akademia" class="auth-input"></div>
                     <div><label for="login-password" class="block text-xs font-bold text-slate-700 mb-1.5">Mot de passe</label><input id="login-password" type="password" required autocomplete="current-password" placeholder="Votre mot de passe" class="auth-input"></div>
                     <label class="flex items-center gap-2 text-xs text-slate-600"><input id="remember-session" type="checkbox" class="rounded border-slate-300"> Rester connecté sur cet appareil</label>
                     <button type="submit" class="w-full py-3 rounded-xl bg-navy-900 hover:bg-navy-800 text-gold-400 font-bold text-sm shadow">Se connecter</button>
@@ -128,12 +128,17 @@
                     <div><label for="register-email" class="block text-xs font-bold text-slate-700 mb-1">Adresse e-mail</label><input id="register-email" type="email" required autocomplete="email" placeholder="nom@exemple.com" class="auth-input"></div>
                     <div><label for="register-phone" class="block text-xs font-bold text-slate-700 mb-1">Numéro de téléphone</label><input id="register-phone" type="tel" required autocomplete="tel" placeholder="Votre numéro de téléphone" class="auth-input"></div>
                     <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-                        <strong>Droit annuel d'inscription : 2 000 Ar</strong><br>
+                        <strong>Droit annuel d'inscription : 2 000 Ar — paiement préalable obligatoire</strong><br>
                         MVola : 0385528349 — Nasandratriniaina Julio<br>
                         Référence obligatoire : <strong>AKADEMIA_DROIT</strong>.<br>
-                        Après la création du compte, connectez-vous à l’espace d’inscription pour déposer votre photo d’identité et la preuve MVola. L’administration vérifiera les pièces avant d’autoriser l’accès aux cours.
+                        Préparez le reçu et la référence de transaction avant de créer votre compte. L'inscription ne sera transmise à l'administration qu'avec les justificatifs requis.
                     </div>
-                    <p class="text-[11px] text-slate-500">Le paiement du droit annuel est distinct de l’abonnement aux cours. La vérification faciale/KYC n’est pas activée dans cette version.</p>
+                    <div><label for="register-transaction-reference" class="block text-xs font-bold text-slate-700 mb-1">Référence / identifiant de transaction MVola</label><input id="register-transaction-reference" type="text" required minlength="3" maxlength="120" class="auth-input" placeholder="Référence exacte figurant sur le reçu"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label for="register-identity-photo" class="block text-xs font-bold text-slate-700 mb-1">Photo d'identité (obligatoire)</label><input id="register-identity-photo" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"><p class="text-[10px] text-slate-500">JPG, PNG ou WEBP — 10 Mo maximum.</p></div>
+                        <div><label for="register-payment-proof" class="block text-xs font-bold text-slate-700 mb-1">Preuve MVola (obligatoire)</label><input id="register-payment-proof" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"><p class="text-[10px] text-slate-500">Image ou PDF — 10 Mo maximum.</p></div>
+                    </div>
+                    <p class="text-[11px] text-slate-500">Le paiement du droit annuel est distinct de l’abonnement aux cours. Les pièces sont temporairement conservées dans ce navigateur jusqu'à leur transfert sécurisé après connexion. La vérification faciale/KYC n’est pas activée.</p>
                     <div><label for="register-series" class="block text-xs font-bold text-slate-700 mb-1">Votre classe / série</label><select id="register-series" required class="auth-input"><option value="" selected disabled>Choisissez votre classe / série</option><option value="Seconde">Seconde</option><option value="Première L">Première L</option><option value="Première S">Première S</option><option value="Première OSE">Première OSE</option><option value="Terminale L">Terminale L</option><option value="Terminale S">Terminale S</option><option value="Terminale OSE">Terminale OSE</option></select></div>
                     <div><label for="register-referral" class="block text-xs font-bold text-slate-700 mb-1">Code de parrainage (facultatif)</label><input id="register-referral" type="text" autocomplete="off" maxlength="8" placeholder="Code à 8 caractères communiqué par un promoteur" class="auth-input"></div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -172,25 +177,6 @@
         </div>
     </section>
 
-    <!-- PORTAIL ADMINISTRATEUR PRIVÉ : URL dédiée ?espace=administration. Aucun accès admin n'est affiché dans la navigation élève. -->
-    <section id="admin-auth-screen" class="hidden min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-        <div class="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl">
-            <div class="bg-navy-950 text-white p-7 border-b border-gold-500/30">
-                <img src="./icons/icon-192.png" alt="Logo Smart Akademia School" class="w-16 h-16 rounded-2xl shadow-lg object-cover" width="192" height="192">
-                <p class="text-xs uppercase tracking-[.2em] text-gold-400 font-bold mt-5">Accès confidentiel</p>
-                <h1 class="font-display text-2xl font-bold mt-1">Espace administrateur</h1>
-                <p class="text-xs text-slate-300 mt-2">Réservé à l'administration de Smart Akademia School.</p>
-            </div>
-            <form class="p-7 space-y-4" onsubmit="handleAdminLogin(event)">
-                <div><label for="admin-login" class="block text-xs font-bold text-slate-700 mb-1.5">Identifiant administrateur</label><input type="text" id="admin-login" required autocomplete="username" class="auth-input" placeholder="Identifiant administrateur" value="akademia"></div>
-                <div><label for="admin-pass" class="block text-xs font-bold text-slate-700 mb-1.5">Mot de passe</label><input type="password" id="admin-pass" required autocomplete="current-password" class="auth-input" placeholder="Mot de passe"></div>
-                <p id="admin-backend-note" class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">Identifiant : <strong>akademia</strong>. L'authentification sécurisée doit être reliée à votre compte administrateur Supabase.</p>
-                <button type="submit" class="w-full py-3 rounded-xl bg-navy-900 text-gold-400 font-bold text-sm">Ouvrir le tableau de bord</button>
-                <a href="?" class="block text-center text-xs text-slate-500 hover:text-navy-900">Retour à l'espace élève</a>
-            </form>
-        </div>
-    </section>
-
     <!-- Changement obligatoire du mot de passe admin initial : écran accessible uniquement après Auth admin. -->
     <section id="admin-password-change-screen" class="hidden min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
         <div class="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl">
@@ -222,11 +208,14 @@
                 <div><label for="applicant-signup-name" class="block text-xs font-bold text-slate-700 mb-1">Nom et prénoms / organisme</label><input id="applicant-signup-name" type="text" required class="auth-input" autocomplete="name"></div>
                 <div><label for="applicant-signup-email" class="block text-xs font-bold text-slate-700 mb-1">Adresse e-mail</label><input id="applicant-signup-email" type="email" required class="auth-input" autocomplete="email"></div>
                 <div><label for="applicant-signup-phone" class="block text-xs font-bold text-slate-700 mb-1">Téléphone</label><input id="applicant-signup-phone" type="tel" required class="auth-input" autocomplete="tel"></div>
+                <div id="applicant-evidence-fields" class="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p class="text-xs text-amber-900">Les justificatifs propres à votre profil sont obligatoires avant la création du compte.</p>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label for="applicant-signup-password" class="block text-xs font-bold text-slate-700 mb-1">Mot de passe</label><input id="applicant-signup-password" type="password" required minlength="12" class="auth-input" autocomplete="new-password"></div>
                     <div><label for="applicant-signup-confirm" class="block text-xs font-bold text-slate-700 mb-1">Confirmation</label><input id="applicant-signup-confirm" type="password" required minlength="12" class="auth-input" autocomplete="new-password"></div>
                 </div>
-                <p class="text-[11px] text-slate-500">Utilisez votre propre adresse e-mail et choisissez un mot de passe robuste. Aucun mot de passe n'est généré ou envoyé automatiquement.</p>
+                <p class="text-[11px] text-slate-500">Utilisez votre adresse e-mail personnelle. Si Supabase demande une confirmation e-mail, les fichiers restent temporairement dans le navigateur actuel et seront transférés dans le stockage privé après votre première connexion. Évitez un appareil partagé.</p>
                 <button type="submit" class="w-full py-3 rounded-xl bg-navy-900 text-gold-400 font-bold text-sm">Créer mon compte candidat</button>
                 <button type="button" onclick="closeApplicantSignup()" class="w-full text-xs text-slate-500">Annuler et revenir à la connexion</button>
             </form>
@@ -1075,7 +1064,7 @@
             // la sécurité des données repose sur les politiques RLS et les contrôles serveur.
             anonKey: 'sb_publishable_RzKdnHECPJ-wGgnSGt2uFg_9w2-R3sZ',
             // Adresse du compte Auth administrateur autorisé dans la migration SQL.
-            // Le nom de connexion affiché à l'écran reste « akademia ».
+            // L'identifiant « akademia » est un alias public mappé ici vers l'e-mail Auth privé.
             adminEmail: 'julio7271@gmail.com'
         };
         const ADMIN_LOGIN_NAME = 'akademia';
@@ -1117,7 +1106,6 @@
             state.currentUser = profile;
             document.body.classList.add('admin-mode');
             document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('admin-auth-screen').classList.add('hidden');
             document.getElementById('app-shell').classList.add('hidden');
             document.getElementById('admin-password-change-screen').classList.remove('hidden');
         }
@@ -1134,7 +1122,6 @@
             state.currentUser = profile;
             document.body.classList.add('admin-mode');
             document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('admin-auth-screen').classList.add('hidden');
             document.getElementById('admin-password-change-screen').classList.add('hidden');
             const app = document.getElementById('app-shell');
             app.classList.remove('hidden');
@@ -3284,8 +3271,8 @@
             loginTab.className = loginSelected ? 'px-3 py-2.5 rounded-lg text-sm font-bold bg-navy-900 text-gold-400' : 'px-3 py-2.5 rounded-lg text-sm font-bold text-slate-600';
             registerTab.className = panel === 'register' ? 'px-3 py-2.5 rounded-lg text-sm font-bold bg-navy-900 text-gold-400' : 'px-3 py-2.5 rounded-lg text-sm font-bold text-slate-600';
             const headings = {
-                login: ['Connexion', 'Connectez-vous pour accéder à votre espace d’apprentissage.'],
-                register: ['Créer un compte', 'Renseignez vos informations pour rejoindre SMART AKADEMIA SCHOOL.'],
+                login: ['Connexion', 'Un seul accès pour les élèves, enseignants, partenaires, promoteurs et l’administration.'],
+                register: ['Inscription élève', 'Effectuez le versement et joignez les justificatifs avant de créer votre compte.'],
                 'forgot-cloud': ['Mot de passe oublié', 'Recevez un lien sécurisé à votre adresse e-mail.'],
                 'update-password': ['Nouveau mot de passe', 'Choisissez un nouveau mot de passe pour votre compte.']
             };
@@ -3370,72 +3357,102 @@
             if (!allowedSeries.includes(series)) return showToast('Choisissez une classe ou série valide avant de créer votre compte.', 'error');
             const password = document.getElementById('register-password').value;
             const confirm = document.getElementById('register-password-confirm').value;
+            const transactionReference = document.getElementById('register-transaction-reference').value.trim();
+            const identityFile = document.getElementById('register-identity-photo').files[0];
+            const paymentProofFile = document.getElementById('register-payment-proof').files[0];
             if (password.length < 8) return showToast('Le mot de passe doit contenir au moins 8 caractères.', 'error');
             if (password !== confirm) return showToast('Les deux mots de passe ne correspondent pas.', 'error');
+            if (transactionReference.length < 3) return showToast('La référence de transaction MVola est obligatoire.', 'error');
+            try {
+                validatePrivateFile(identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+                validatePrivateFile(paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            } catch (error) { return showToast(error.message, 'error'); }
             if (!supabaseClient) return showToast('Inscription indisponible : le serveur Supabase doit être configuré par le responsable.', 'error');
-            if (supabaseClient) {
-                try {
-                    const { data, error } = await supabaseClient.auth.signUp({
-                        email, password,
-                        options: { data: { full_name: name, phone, series, role: 'student', referral_code: (document.getElementById('register-referral')?.value || '').trim().toUpperCase() || null } }
-                    });
-                    if (error) throw error;
-                    e.target.reset();
-                    if (data.session && data.user) {
-                        const profile = await getCloudProfile(data.user.id);
-                        if (profile.role !== 'student') throw new Error('Ce compte n’est pas un compte élève.');
-                        if (profile.registrationStatus !== 'approved') { await openRolePortal(profile); showToast('Déposez maintenant votre photo d’identité et la preuve MVola pour validation.', 'info'); return; }
-                        await openAppForStudent(profile);
-                        showToast(`Bienvenue ${profile.name} !`);
-                    } else {
-                        showToast('Compte créé. Vérifiez votre boîte e-mail pour confirmer votre adresse, puis connectez-vous.', 'info');
-                        showAuthPanel('login');
-                    }
-                } catch (error) { showToast(error.message || 'Inscription impossible.', 'error'); }
-                return;
+            let accountCreated = false;
+            try {
+                // Les justificatifs sont demandés AVANT la création du compte.
+                // Ils restent temporairement dans IndexedDB jusqu'à la première session Auth.
+                await savePendingSignupEvidence(email, {
+                    kind: 'student', transactionReference, identityFile, paymentProofFile,
+                    referralCode: (document.getElementById('register-referral')?.value || '').trim().toUpperCase() || null,
+                    createdAt: new Date().toISOString()
+                });
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email, password,
+                    options: { data: { full_name: name, phone, series, role: 'student', referral_code: (document.getElementById('register-referral')?.value || '').trim().toUpperCase() || null } }
+                });
+                if (error) throw error;
+                accountCreated = !!data.user;
+                e.target.reset();
+                if (data.session && data.user) {
+                    let profile = await getCloudProfile(data.user.id);
+                    if (profile.role !== 'student') throw new Error('Ce compte n’est pas un compte élève.');
+                    await processPendingSignupEvidence(profile);
+                    profile = await getCloudProfile(data.user.id);
+                    await openRolePortal(profile);
+                    showToast('Compte créé. Photo d’identité et preuve de paiement transmises pour validation.', 'success');
+                } else {
+                    showAuthPanel('login');
+                    showToast('Compte créé. Confirmez votre adresse e-mail, puis connectez-vous depuis ce même navigateur : les justificatifs seront transférés en privé avant l’examen du dossier.', 'info');
+                }
+            } catch (error) {
+                if (accountCreated) {
+                    document.getElementById('auth-screen').classList.remove('hidden');
+                    showAuthPanel('login');
+                    showToast(`Compte créé, mais le transfert des justificatifs reste à terminer. Connectez-vous depuis ce même navigateur pour réessayer. ${error.message || ''}`, 'error');
+                } else {
+                    showToast(error.message || 'Inscription impossible.', 'error');
+                }
             }
-            return showToast('Inscription sécurisée non disponible.', 'error');
-
         }
 
         async function handleStudentLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('login-email').value.trim().toLowerCase();
+            const loginValue = document.getElementById('login-email').value.trim();
+            const normalizedLogin = loginValue.toLowerCase();
             const password = document.getElementById('login-password').value;
+            const isAdminAlias = normalizedLogin === ADMIN_LOGIN_NAME;
+            const email = isAdminAlias ? (SUPABASE_CONFIG.adminEmail || '').trim().toLowerCase() : normalizedLogin;
             if (!supabaseClient) return showToast('Connexion indisponible : le serveur Supabase doit être configuré.', 'error');
-            if (supabaseClient) {
-                try {
-                    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                    if (error) throw error;
-                    const profile = await getCloudProfile(data.user.id);
-                    if (profile.role === 'admin') {
-                        await supabaseClient.auth.signOut();
-                        return showToast('Utilisez le portail administrateur dédié.', 'error');
-                    }
-                    if (['applicant','teacher','partner','promoter'].includes(profile.role)) {
-                        e.target.reset();
-                        return await openRolePortal(profile);
-                    }
-                    if (profile.role !== 'student') {
-                        await supabaseClient.auth.signOut();
-                        return showToast('Ce compte ne possède pas un rôle de connexion reconnu.', 'error');
-                    }
-                    if (profile.registrationStatus !== 'approved') {
-                        e.target.reset();
-                        return await openRolePortal(profile);
-                    }
-                    if (!['Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'].includes(profile.series)) {
-                        await supabaseClient.auth.signOut();
-                        return showToast('Votre compte ne possède pas une classe valide. Contactez l’administration.', 'error');
-                    }
-                    await openAppForStudent(profile);
-                    e.target.reset();
-                    showToast(`Bienvenue ${profile.name} !`);
-                } catch (error) { showToast(error.message || 'Adresse e-mail ou mot de passe incorrect.', 'error'); }
-                return;
+            if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+                return showToast('Saisissez votre adresse e-mail. Pour l’administrateur, utilisez l’identifiant « akademia ».', 'error');
             }
-            return showToast('Connexion sécurisée non disponible.', 'error');
-
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    if (isAdminAlias && /invalid login credentials/i.test(error.message || '')) {
+                        throw new Error(`Connexion administrateur refusée. L’identifiant « akademia » est relié au compte Auth ${email}. Vérifiez que cet utilisateur existe et que son mot de passe est correct. Si le compte n’existe pas encore, le propriétaire doit le créer dans Supabase Authentication > Users, puis vérifier son rôle admin dans public.profiles.`);
+                    }
+                    if (/email not confirmed/i.test(error.message || '')) throw new Error('Adresse e-mail non confirmée. Consultez votre boîte de réception puis réessayez.');
+                    throw error;
+                }
+                let profile = await getCloudProfile(data.user.id);
+                // Si l'inscription a été commencée avant la confirmation e-mail, les justificatifs
+                // locaux sont téléversés maintenant que Supabase Auth fournit une session.
+                try { await processPendingSignupEvidence(profile); }
+                catch (uploadError) { console.error('Transfert des pièces d’inscription :', uploadError); showToast(`Connexion établie, mais les justificatifs n’ont pas été transférés : ${uploadError.message || 'erreur de stockage'}. Vous pourrez réessayer dans votre dossier.`, 'error'); }
+                profile = await getCloudProfile(data.user.id);
+                e.target.reset();
+                if (profile.role === 'admin') {
+                    await openAppForAdmin(profile);
+                    if (!profile.mustChangePassword) showToast('Bienvenue dans l’espace administrateur.', 'success');
+                    return;
+                }
+                if (['applicant','teacher','partner','promoter'].includes(profile.role)) return await openRolePortal(profile);
+                if (profile.role !== 'student') {
+                    await supabaseClient.auth.signOut();
+                    return showToast('Ce compte ne possède pas un rôle de connexion reconnu.', 'error');
+                }
+                if (profile.registrationStatus !== 'approved') return await openRolePortal(profile);
+                if (!['Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'].includes(profile.series)) {
+                    await supabaseClient.auth.signOut();
+                    return showToast('Votre compte ne possède pas une classe valide. Contactez l’administration.', 'error');
+                }
+                await openAppForStudent(profile);
+                showToast(`Bienvenue ${profile.name} !`, 'success');
+            } catch (error) {
+                showToast(error.message || 'Adresse e-mail ou mot de passe incorrect.', 'error');
+            }
         }
 
         async function handlePasswordReset(e) { return handleCloudPasswordReset(e); }
@@ -4241,41 +4258,6 @@
             return showToast('Enregistrement de paiement indisponible sans connexion Supabase.', 'error');
         }
 
-        async function handleAdminLogin(e) {
-            e.preventDefault();
-            const login = document.getElementById('admin-login').value.trim().toLowerCase();
-            const password = document.getElementById('admin-pass').value;
-            if (login !== ADMIN_LOGIN_NAME) return showToast('Identifiant administrateur incorrect.', 'error');
-            if (!supabaseClient) return showToast('Configurez Supabase pour activer la connexion administrateur sécurisée.', 'error');
-            const adminEmail = (SUPABASE_CONFIG.adminEmail || '').trim().toLowerCase();
-            if (!adminEmail || adminEmail === 'votre_email_admin' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) {
-                return showToast('Renseignez SUPABASE_CONFIG.adminEmail avec l’adresse Auth du compte administrateur.', 'error');
-            }
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email: adminEmail, password });
-                if (error) throw error;
-                const profile = await getCloudProfile(data.user.id);
-                if (profile.role !== 'admin') {
-                    await supabaseClient.auth.signOut();
-                    throw new Error('Ce compte ne possède pas le rôle administrateur.');
-                }
-                e.target.reset();
-                document.getElementById('admin-login').value = ADMIN_LOGIN_NAME;
-                await openAppForAdmin(profile);
-                showToast('Bienvenue dans votre espace administrateur.');
-            } catch (error) {
-                // Ne pas conserver une session qui a échoué au contrôle du rôle administrateur.
-                if (supabaseClient) await supabaseClient.auth.signOut().catch(() => {});
-                state.isAdmin = false;
-                state.currentUser = null;
-                document.body.classList.remove('admin-mode');
-                document.getElementById('app-shell').classList.add('hidden');
-                document.getElementById('admin-password-change-screen').classList.add('hidden');
-                document.getElementById('admin-auth-screen').classList.remove('hidden');
-                showToast(error.message || 'Connexion administrateur refusée.', 'error');
-            }
-        }
-
         async function logoutAdmin() {
             if (courseAccessTimer) clearTimeout(courseAccessTimer);
             courseAccessTimer = null; nextCourseAccessChangeAt = null;
@@ -4288,9 +4270,10 @@
             document.getElementById('admin-password-change-screen').classList.add('hidden');
             document.getElementById('app-shell').classList.add('hidden');
             document.getElementById('app-shell').classList.remove('flex');
-            document.getElementById('admin-auth-screen').classList.remove('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+            showAuthPanel('login');
             applyAdminControls();
-            showToast('Vous êtes déconnecté de l’espace administrateur.', 'info');
+            showToast('Vous êtes déconnecté de la plateforme.', 'info');
         }
 
         function updateAdminStats() {
@@ -4624,45 +4607,30 @@
 
             const params = new URLSearchParams(window.location.search);
             if (params.get('password-reset') === '1' && supabaseClient) {
-                document.getElementById('admin-auth-screen').classList.add('hidden');
                 document.getElementById('auth-screen').classList.remove('hidden');
                 showAuthPanel('update-password');
                 return;
             }
-
-            if (params.get('espace') === 'administration') {
-                document.getElementById('auth-screen').classList.add('hidden');
-                document.getElementById('admin-auth-screen').classList.remove('hidden');
-                const note = document.getElementById('admin-backend-note');
-                if (!supabaseClient) {
-                    note.textContent = 'Portail privé. Configurez l’URL et la clé publique Supabase ainsi que l’adresse Auth du compte admin ; attribuez ensuite le rôle serveur et activez le changement de mot de passe initial.';
-                } else {
-                    note.textContent = 'Identifiant : akademia. Le mot de passe est vérifié par Supabase Auth ; seuls les comptes dont le rôle serveur est admin sont autorisés.';
-                    const { data } = await supabaseClient.auth.getSession();
-                    if (data.session?.user) {
-                        try {
-                            const profile = await getCloudProfile(data.session.user.id);
-                            if (profile.role === 'admin') return await openAppForAdmin(profile);
-                            await supabaseClient.auth.signOut();
-                        } catch (error) {
-                            await supabaseClient.auth.signOut().catch(() => {});
-                            console.warn('Restauration de la session administrateur refusée :', error);
-                            note.textContent = error.message || 'La session existante ne possède pas les droits administrateur actifs. Reconnectez-vous après vérification du compte.';
-                        }
-                    }
-                }
-                return;
+            // Ancien lien ?espace=administration : il revient désormais au formulaire unique.
+            if (params.has('espace')) {
+                params.delete('espace');
+                const cleanUrl = new URL(window.location.href);
+                cleanUrl.searchParams.delete('espace');
+                history.replaceState({}, '', cleanUrl.toString());
             }
 
             if (supabaseClient) {
                 const { data } = await supabaseClient.auth.getSession();
                 if (data.session?.user) {
                     try {
-                        const profile = await getCloudProfile(data.session.user.id);
+                        let profile = await getCloudProfile(data.session.user.id);
+                        try { await processPendingSignupEvidence(profile); }
+                        catch (uploadError) { console.warn('Transfert des pièces d’inscription après restauration :', uploadError); }
+                        profile = await getCloudProfile(data.session.user.id);
+                        if (profile.role === 'admin') return await openAppForAdmin(profile);
                         if (profile.role === 'student' && profile.registrationStatus !== 'approved') return await openRolePortal(profile);
                         if (profile.role === 'student') return await openAppForStudent(profile);
                         if (['applicant','teacher','partner','promoter'].includes(profile.role)) return await openRolePortal(profile);
-                        // Ne jamais afficher le tableau de bord admin dans le parcours élève.
                         await supabaseClient.auth.signOut();
                     } catch (error) { console.warn('Restauration de session impossible', error); }
                 }
