@@ -99,3 +99,13 @@ Voir `GUIDE_DEPLOIEMENT.md` pour le détail et les URL de redirection Supabase/N
 ### Gestion des affectations de cours
 
 L’espace administrateur dispose d’un formulaire pour affecter un enseignant approuvé à une matière et aux séries sélectionnées, par la RPC sécurisée `admin_assign_teacher_subject()` existante en migration 06. La liste des affectations actives est visible dans le même panneau. Pour que le nom apparaisse chez l’élève, l’affectation doit être nommée exactement « Philosophie » et inclure sa série.
+
+
+## Correctif des parcours d'inscription et de connexion (mise à jour)
+
+- Le site utilise désormais un seul formulaire de connexion commun à tous les rôles. `akademia` est un alias mappé vers l'e-mail Auth configuré ; le rôle est relu côté Supabase et détermine le tableau de bord. La restauration de session admin passe également par la vérification serveur.
+- Le formulaire d'inscription élève demande en amont la photo d'identité, la preuve MVola et la référence de transaction avant la création du compte.
+- Le formulaire initial des enseignants et promoteurs exige photo d'identité et preuve du diplôme ; le candidat partenaire doit joindre le justificatif de sa première cotisation de 100 000 Ar, avec mode et référence.
+- Les documents sont conservés temporairement dans IndexedDB, dans le navigateur courant, en attendant la première session Auth lorsque la confirmation e-mail est activée ; puis ils sont transférés vers des buckets privés. Un changement d'appareil impose de re-sélectionner les justificatifs.
+- Migration 10 : autorise l'upload partenaire au stade `applicant`, exige les preuves de cotisation pour l'approbation et crée ensuite une contribution en attente de validation manuelle.
+- Diagnostic admin en lecture seule : `supabase/diagnostics/10_DIAGNOSTIC_CONNEXION_ADMIN.sql`.

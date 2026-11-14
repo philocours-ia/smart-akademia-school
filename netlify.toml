@@ -1,0 +1,4 @@
+[build]
+  publish = "site"
+
+# Application statique HTML/CSS/JavaScript : aucune commande de build n'est requise.

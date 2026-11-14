@@ -688,6 +688,36 @@
                 </button>
             </div>
 
+
+            <!-- Boîte de validation unifiée : tous les dossiers à traiter sont visibles dès l’ouverture de l’administration -->
+            <section id="admin-validation-inbox" class="rounded-2xl border-2 border-gold-400 bg-gradient-to-br from-amber-50 via-white to-indigo-50 p-4 md:p-6 shadow-md space-y-4">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-[.2em] text-amber-800">Priorité administrative</span>
+                        <h3 class="font-display text-xl md:text-2xl font-bold text-navy-950 mt-1"><i class="fas fa-clipboard-check text-gold-600 mr-2"></i>Boîte de validation — inscriptions et candidatures</h3>
+                        <p class="text-sm text-slate-600 mt-1">Les dossiers complets, les pièces justificatives et les actions de validation ou de refus sont regroupés ici. Les décisions restent vérifiées par Supabase.</p>
+                    </div>
+                    <button type="button" onclick="refreshAdminValidationInbox()" class="shrink-0 rounded-xl bg-navy-950 text-gold-300 px-4 py-3 text-xs font-bold"><i class="fas fa-sync-alt mr-2"></i>Actualiser toutes les demandes</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button type="button" onclick="scrollToAdminValidation('admin-inbox-students')" class="text-left rounded-xl border border-orange-200 bg-white p-3 hover:bg-orange-50"><span class="text-[10px] font-bold uppercase text-orange-800">Inscriptions élèves</span><strong id="admin-inbox-student-count" class="block text-2xl text-orange-950">—</strong><span class="text-[10px] text-slate-500">Dossiers à examiner</span></button>
+                    <button type="button" onclick="scrollToAdminValidation('admin-inbox-professionals')" class="text-left rounded-xl border border-indigo-200 bg-white p-3 hover:bg-indigo-50"><span class="text-[10px] font-bold uppercase text-indigo-800">Candidatures professionnelles</span><strong id="admin-inbox-professional-count" class="block text-2xl text-indigo-950">—</strong><span class="text-[10px] text-slate-500">Enseignants, partenaires, promoteurs</span></button>
+                    <button type="button" onclick="scrollToAdminValidation('admin-inbox-partners')" class="text-left rounded-xl border border-emerald-200 bg-white p-3 hover:bg-emerald-50"><span class="text-[10px] font-bold uppercase text-emerald-800">Cotisations partenaires</span><strong id="admin-inbox-partner-count" class="block text-2xl text-emerald-950">—</strong><span class="text-[10px] text-slate-500">Preuves de paiement à vérifier</span></button>
+                </div>
+                <div id="admin-inbox-students" class="scroll-mt-6 rounded-xl border border-orange-200 bg-white p-4 space-y-3">
+                    <div class="flex flex-wrap justify-between items-center gap-2"><div><h4 class="font-bold text-navy-950"><i class="fas fa-user-graduate text-orange-600 mr-2"></i>1. Inscriptions des élèves</h4><p class="text-xs text-slate-500">Identité, série, coordonnées, preuve MVola de 2 000 Ar et référence AKADEMIA_DROIT.</p></div><span class="text-[10px] rounded-full bg-orange-100 text-orange-900 px-3 py-1 font-bold">Validation requise</span></div>
+                    <div id="admin-registration-list" class="space-y-2.5"><p class="text-xs text-slate-400">Chargement des inscriptions…</p></div>
+                </div>
+                <div id="admin-inbox-professionals" class="scroll-mt-6 rounded-xl border border-indigo-200 bg-white p-4 space-y-3">
+                    <div class="flex flex-wrap justify-between items-center gap-2"><div><h4 class="font-bold text-navy-950"><i class="fas fa-user-tie text-indigo-600 mr-2"></i>2. Candidatures professionnelles</h4><p class="text-xs text-slate-500">Dossiers complets des enseignants, partenaires et promoteurs, avec pièces consultables et décisions.</p></div><span class="text-[10px] rounded-full bg-indigo-100 text-indigo-900 px-3 py-1 font-bold">Validation requise</span></div>
+                    <div id="admin-role-applications-list" class="space-y-3"><p class="text-xs text-slate-400">Chargement des candidatures…</p></div>
+                </div>
+                <div id="admin-inbox-partners" class="scroll-mt-6 rounded-xl border border-emerald-200 bg-white p-4 space-y-3">
+                    <div class="flex flex-wrap justify-between items-center gap-2"><div><h4 class="font-bold text-navy-950"><i class="fas fa-handshake text-emerald-600 mr-2"></i>3. Cotisations partenaires</h4><p class="text-xs text-slate-500">Preuve, montant, mode de paiement et référence de transaction.</p></div><span class="text-[10px] rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 font-bold">Vérification requise</span></div>
+                    <div id="admin-partner-contributions-list" class="space-y-2"><p class="text-xs text-slate-400">Chargement des cotisations…</p></div>
+                </div>
+            </section>
+
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-3">
                 <div class="flex items-center justify-between gap-3"><div><h3 class="font-bold text-navy-900"><i class="fas fa-inbox text-indigo-600 mr-2"></i>Messagerie administrative multi-profils</h3><p class="text-xs text-slate-500 mt-1">Messages adressés à l’administration et réponses aux élèves, enseignants, partenaires et promoteurs.</p></div><button type="button" onclick="loadAdminRoleMessages()" class="text-xs border rounded-lg px-3 py-2">Actualiser</button></div>
                 <form id="admin-role-message-form" onsubmit="sendAdminRoleMessage(event)" class="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -746,15 +776,6 @@
                 <p class="text-[10px] text-slate-500">Limite : ce tableau ne constitue pas un système de détection d'incidents techniques. Les erreurs Auth, RLS, Storage et les journaux serveur doivent toujours être contrôlés dans le tableau de bord Supabase.</p>
             </section>
 
-            <!-- Validation des inscriptions élèves : décisions exécutées par RPC Supabase protégée -->
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                    <div><h3 class="font-bold text-navy-900 text-base"><i class="fas fa-user-check text-emerald-600 mr-2"></i>Validation de l'inscription</h3><p class="text-xs text-slate-500 mt-1">Examinez les nouveaux comptes élèves et approuvez ou refusez leur inscription.</p></div>
-                    <button type="button" onclick="renderAdminLists()" class="text-xs font-bold text-navy-900 border border-slate-200 rounded-lg px-3 py-2"><i class="fas fa-sync-alt mr-1"></i> Actualiser</button>
-                </div>
-                <div id="admin-registration-list" class="space-y-2.5"><p class="text-xs text-slate-400">Chargement des inscriptions…</p></div>
-            </div>
-
             <!-- Suivi pédagogique et état des abonnements des élèves -->
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-3"><div><h3 class="font-bold text-navy-900 text-base"><i class="fas fa-chart-line text-indigo-600 mr-2"></i>Suivi de l'avancement des élèves</h3><p class="text-xs text-slate-500 mt-1">Progression par série, leçons terminées et dernière activité enregistrée.</p></div><button onclick="renderAdminLists()" class="text-xs font-bold text-navy-900 border border-slate-200 rounded-lg px-3 py-2"><i class="fas fa-sync-alt mr-1"></i> Actualiser</button></div>
@@ -787,10 +808,6 @@
                     <!-- Généré par JS -->
                 </div>
             </div>
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
-                <div><h3 class="font-bold text-navy-900"><i class="fas fa-user-tie text-indigo-600 mr-2"></i>Gestion des candidatures professionnelles</h3><p class="text-xs text-slate-500 mt-1">Enseignants, partenaires et promoteurs. Les pièces restent dans un stockage privé.</p></div>
-                <div id="admin-role-applications-list" class="space-y-3"><p class="text-xs text-slate-400">Chargement…</p></div>
-            </div>
             <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
                 <div class="flex flex-wrap justify-between items-center gap-2"><div><h3 class="font-bold text-navy-900"><i class="fas fa-chalkboard-teacher text-indigo-600 mr-2"></i>Affectations pédagogiques</h3><p class="text-xs text-slate-500 mt-1">Affectez un enseignant approuvé à une matière et à une ou plusieurs séries. L'affectation Philosophie alimente le nom du responsable affiché aux élèves.</p></div><button type="button" onclick="loadAdminTeacherAssignments()" class="text-xs border rounded-lg px-3 py-2">Actualiser</button></div>
                 <form id="admin-teacher-assignment-form" onsubmit="saveAdminTeacherAssignment(event)" class="space-y-3 rounded-xl bg-slate-50 p-4">
@@ -809,7 +826,6 @@
                 <div id="admin-teacher-assignments-list" class="space-y-2"><p class="text-xs text-slate-400">Chargement des affectations…</p></div>
             </section>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                <div class="bg-white rounded-2xl p-5 border border-slate-200 space-y-3"><h3 class="font-bold text-navy-900"><i class="fas fa-hand-holding-usd text-emerald-600 mr-2"></i>Cotisations partenaires</h3><div id="admin-partner-contributions-list" class="space-y-2"><p class="text-xs text-slate-400">Chargement…</p></div></div>
                 <div class="bg-white rounded-2xl p-5 border border-slate-200 space-y-3"><h3 class="font-bold text-navy-900"><i class="fas fa-wallet text-amber-600 mr-2"></i>Paie et demandes financières</h3><div id="admin-finance-requests-list" class="space-y-2"><p class="text-xs text-slate-400">Chargement…</p></div></div>
                 <div class="bg-white rounded-2xl p-5 border border-slate-200 space-y-3"><h3 class="font-bold text-navy-900"><i class="fas fa-calendar-check text-indigo-600 mr-2"></i>Demandes administratives du personnel</h3><div id="admin-staff-requests-list" class="space-y-2"><p class="text-xs text-slate-400">Chargement…</p></div></div>
                 <div class="bg-white rounded-2xl p-5 border border-slate-200 space-y-3"><h3 class="font-bold text-navy-900"><i class="fas fa-chalkboard-teacher text-indigo-600 mr-2"></i>Journées de travail validées</h3><div id="admin-teacher-workday-list" class="space-y-2"><p class="text-xs text-slate-400">Chargement…</p></div></div>
@@ -4298,6 +4314,12 @@
                 const studentDetail = document.getElementById('supervision-students-detail');
                 if (studentDetail) studentDetail.textContent = `${Number(m.students_approved || 0).toLocaleString('fr-FR')} approuvés · ${Number(m.students_pending || 0).toLocaleString('fr-FR')} en attente`;
                 set('supervision-students-rejected', m.students_rejected);
+                const inboxStudents = document.getElementById('admin-inbox-student-count');
+                const inboxProfessionals = document.getElementById('admin-inbox-professional-count');
+                const inboxPartners = document.getElementById('admin-inbox-partner-count');
+                if (inboxStudents) inboxStudents.textContent = Number(m.students_pending || 0).toLocaleString('fr-FR');
+                if (inboxProfessionals) inboxProfessionals.textContent = Number(m.professional_applications_pending || 0).toLocaleString('fr-FR');
+                if (inboxPartners) inboxPartners.textContent = Number(m.partner_contributions_pending || 0).toLocaleString('fr-FR');
                 set('supervision-subscriptions-active', m.active_subscriptions);
                 set('supervision-subscriptions-expired', m.expired_subscriptions);
                 const expired = document.getElementById('supervision-subscriptions-expired');
@@ -4379,13 +4401,40 @@
             }
         }
 
+        function scrollToAdminValidation(targetId) {
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            target.classList.add('ring-2', 'ring-gold-400');
+            window.setTimeout(() => target.classList.remove('ring-2', 'ring-gold-400'), 1800);
+        }
+
+        async function refreshAdminValidationInbox() {
+            if (!state.isAdmin || !supabaseClient) return showToast('Connexion administrateur requise.', 'error');
+            const button = document.querySelector('#admin-validation-inbox button[onclick="refreshAdminValidationInbox()"]');
+            if (button) { button.disabled = true; button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Actualisation…'; }
+            try {
+                await renderAdminLists();
+                showToast('Les dossiers d’inscription et candidatures ont été actualisés.', 'success');
+            } catch (error) {
+                showToast(error.message || 'Impossible d’actualiser les demandes.', 'error');
+            } finally {
+                if (button) { button.disabled = false; button.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Actualiser toutes les demandes'; }
+            }
+        }
+
         async function renderAdminLists() {
             if (!state.isAdmin) return;
+            // Charge la boîte de candidatures en premier : un échec d’un autre module ne doit pas la masquer.
+            if (typeof renderRoleAdminLists === 'function') {
+                try { await renderRoleAdminLists(); }
+                catch (roleListError) { console.error('Boîte de validation professionnelle :', roleListError); }
+            }
             if (supabaseClient) {
                 const [subResult, msgResult, profileResult, progressResult, scheduleResult, enrollmentResult] = await Promise.all([
                     supabaseClient.from('subscriptions').select('*').order('created_at', { ascending: false }),
                     supabaseClient.from('student_messages').select('*').order('created_at', { ascending: false }),
-                    supabaseClient.from('profiles').select('id,email,full_name,series,role,registration_status,created_at').eq('role', 'student').order('created_at', { ascending: false }),
+                    supabaseClient.from('profiles').select('id,email,full_name,phone,series,role,registration_status,created_at').eq('role', 'student').order('created_at', { ascending: false }),
                     supabaseClient.from('student_progress').select('user_id,lesson_id,completed,updated_at'),
                     supabaseClient.from('course_release_schedule').select('series,lesson_id,release_at').order('release_at', { ascending: true }),
                     supabaseClient.from('student_enrollment_submissions').select('*').order('created_at', { ascending: false })
@@ -4414,7 +4463,7 @@
                     }
                 }
                 state.students = (profileResult.data || []).map(p => ({ id: p.id, email: p.email, name: p.full_name, serie: p.series, createdAt: p.created_at }));
-                state.studentRegistrations = (profileResult.data || []).map(p => ({ id: p.id, email: p.email, name: p.full_name, serie: p.series, status: p.registration_status || 'pending', createdAt: p.created_at }));
+                state.studentRegistrations = (profileResult.data || []).map(p => ({ id: p.id, email: p.email, name: p.full_name, phone: p.phone, serie: p.series, status: p.registration_status || 'pending', createdAt: p.created_at }));
                 state.progressRecords = progressResult.data || [];
                 state.subscriptions = (subResult.data || []).map(s => ({
                     id: s.id, name: s.full_name, serie: s.series, phone: s.phone,
@@ -4443,21 +4492,32 @@
             const registrationContainer = document.getElementById('admin-registration-list');
             if (registrationContainer) {
                 const pending = (state.studentRegistrations || []).filter(r => r.status === 'pending');
+                const processedStudents = (state.studentRegistrations || []).filter(r => r.status !== 'pending');
+                if (profileResult.error) {
+                    registrationContainer.innerHTML = `<div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>La liste des inscriptions n’a pas pu être chargée.</strong><br>${escapeHtml(profileResult.error.message || 'Erreur de lecture des profils.')}<br>Le compteur général peut être exact, mais les dossiers ne sont pas visibles tant que les droits RLS / la requête ne sont pas corrigés.</div>`;
+                } else {
                 const enrollmentRows = enrollmentResult?.data || [];
                 const cards = [];
                 for (const r of pending) {
-                    const dossier = enrollmentRows.find(x => x.user_id === r.id && x.status === 'pending');
-                    let evidence = '<p class="text-[11px] text-amber-800 mt-2">Dossier incomplet : l’élève doit déposer sa photo d’identité et sa preuve MVola.</p>';
+                    const dossier = enrollmentRows.filter(x => x.user_id === r.id && x.status === 'pending').sort((a,b) => new Date(b.created_at)-new Date(a.created_at))[0];
+                    let evidence = '<div class="mt-3 rounded-lg border border-amber-300 bg-amber-100 p-3 text-xs text-amber-950"><strong>Dossier incomplet.</strong> Aucune soumission en attente ne contient les deux justificatifs requis. Demandez à l’élève de compléter son dossier ; l’approbation reste bloquée côté Supabase.</div>';
+                    let evidenceReviewable = false;
                     if (dossier) {
-                        const [photoUrl, proofUrl] = await Promise.all([
+                        const [photoResult, proofResult] = await Promise.all([
                             supabaseClient.storage.from('student-enrollment-documents').createSignedUrl(dossier.identity_photo_path, 900),
                             supabaseClient.storage.from('student-enrollment-documents').createSignedUrl(dossier.payment_proof_path, 900)
                         ]);
-                        evidence = `<p class="text-xs text-slate-700 mt-2">Droit : ${Number(dossier.amount_ar).toLocaleString('fr-FR')} Ar • Réf. ${escapeHtml(dossier.payment_reference)} • transaction ${escapeHtml(dossier.transaction_reference)}</p><div class="flex flex-wrap gap-3 mt-1">${photoUrl.data?.signedUrl ? `<a target="_blank" rel="noopener noreferrer" class="text-xs underline text-indigo-700" href="${escapeHtml(photoUrl.data.signedUrl)}">Photo d’identité</a>` : '<span class="text-xs text-rose-700">Photo indisponible</span>'}${proofUrl.data?.signedUrl ? `<a target="_blank" rel="noopener noreferrer" class="text-xs underline text-indigo-700" href="${escapeHtml(proofUrl.data.signedUrl)}">Preuve de paiement</a>` : '<span class="text-xs text-rose-700">Preuve indisponible</span>'}</div>`;
+                        const photoUrl = photoResult.data?.signedUrl || '';
+                        const proofUrl = proofResult.data?.signedUrl || '';
+                        evidenceReviewable = !!photoUrl && !!proofUrl;
+                        evidence = `<div class="mt-3 rounded-lg border border-slate-200 bg-white p-3 space-y-2"><p class="text-xs font-bold text-navy-900">Dossier de paiement et d’identité</p><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs"><p><span class="text-slate-500">Droit d’inscription :</span> <strong>${Number(dossier.amount_ar).toLocaleString('fr-FR')} Ar</strong></p><p><span class="text-slate-500">Mode :</span> <strong>${escapeHtml(dossier.payment_method || 'MVola')}</strong></p><p><span class="text-slate-500">Référence obligatoire :</span> <strong>${escapeHtml(dossier.payment_reference)}</strong></p><p><span class="text-slate-500">Transaction :</span> <strong class="font-mono">${escapeHtml(dossier.transaction_reference)}</strong></p><p><span class="text-slate-500">Dossier déposé :</span> ${dossier.created_at ? new Date(dossier.created_at).toLocaleString('fr-FR') : 'Date non disponible'}</p><p><span class="text-slate-500">Statut du dossier :</span> <strong>${escapeHtml(dossier.status)}</strong></p></div><div class="flex flex-wrap gap-3 pt-1">${photoUrl ? `<a target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-bold underline text-indigo-700" href="${escapeHtml(photoUrl)}"><i class="fas fa-id-card"></i> Ouvrir la photo d’identité</a>` : '<span class="text-xs text-rose-700">Photo d’identité non consultable (vérifier Storage/RLS).</span>'}${proofUrl ? `<a target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-bold underline text-indigo-700" href="${escapeHtml(proofUrl)}"><i class="fas fa-receipt"></i> Ouvrir la preuve MVola</a>` : '<span class="text-xs text-rose-700">Preuve de paiement non consultable (vérifier Storage/RLS).</span>'}</div>${evidenceReviewable ? '<p class="text-[10px] text-emerald-700">Les deux pièces sont consultables. Vérifiez le nom, le montant et la référence sur les justificatifs avant de décider.</p>' : '<p class="text-[10px] text-rose-700">La validation est masquée tant que les deux pièces privées ne peuvent pas être consultées.</p>'}</div>`;
                     }
-                    cards.push(`<div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50 flex flex-col gap-3"><div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2"><div class="min-w-0"><p class="font-bold text-sm text-navy-900">${escapeHtml(r.name || 'Nom non renseigné')}</p><p class="text-xs text-slate-600">${escapeHtml(r.email)} · ${escapeHtml(r.serie)} · ${new Date(r.createdAt).toLocaleString('fr-FR')}</p><span class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">En attente</span>${evidence}</div><div class="flex flex-wrap gap-2">${dossier ? `<button type="button" onclick="decideStudentRegistration('${r.id}','approved')" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold">Validation de l'inscription</button>` : ''}<button type="button" onclick="decideStudentRegistration('${r.id}','rejected')" class="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-xs font-bold">Refuser</button></div></div></div>`);
+                    cards.push(`<article class="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3"><div class="flex flex-col lg:flex-row lg:items-start justify-between gap-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h5 class="font-bold text-base text-navy-950">${escapeHtml(r.name || 'Nom non renseigné')}</h5><span class="rounded-full bg-amber-200 px-2.5 py-1 text-[10px] font-bold text-amber-950">Inscription en attente</span></div><div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 mt-2 text-xs text-slate-700"><p><span class="text-slate-500">E-mail :</span> ${escapeHtml(r.email || 'Non renseigné')}</p><p><span class="text-slate-500">Téléphone :</span> ${escapeHtml(r.phone || 'Non renseigné')}</p><p><span class="text-slate-500">Classe / série :</span> ${escapeHtml(r.serie || 'Non renseignée')}</p><p><span class="text-slate-500">Compte créé :</span> ${r.createdAt ? new Date(r.createdAt).toLocaleString('fr-FR') : 'Date non disponible'}</p><p><span class="text-slate-500">Identifiant dossier :</span> <span class="font-mono">${escapeHtml(r.id)}</span></p></div>${evidence}</div><div class="flex flex-row lg:flex-col gap-2 shrink-0">${dossier && evidenceReviewable ? `<button type="button" onclick="decideStudentRegistration('${r.id}','approved')" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold"><i class="fas fa-check mr-1"></i>Valider l’inscription</button>` : `<button type="button" disabled title="Dossier et pièces consultables requis" class="rounded-lg bg-slate-200 text-slate-500 px-4 py-2.5 text-xs font-bold cursor-not-allowed">Validation indisponible</button>`}<button type="button" onclick="decideStudentRegistration('${r.id}','rejected')" class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2.5 text-xs font-bold">Refuser / demander régularisation</button></div></div></article>`);
                 }
-                registrationContainer.innerHTML = cards.length ? cards.join('') : '<p class="text-xs text-slate-500">Aucune inscription élève en attente de validation.</p>';
+                const history = processedStudents.length ? `<details class="rounded-xl border border-slate-200 bg-slate-50 p-3 mt-3"><summary class="cursor-pointer text-xs font-bold text-slate-700">Historique des inscriptions déjà traitées (${processedStudents.length})</summary><div class="mt-3 space-y-2">${processedStudents.map(r => `<div class="rounded-lg border bg-white p-3 text-xs"><div class="flex flex-wrap justify-between gap-2"><strong>${escapeHtml(r.name || 'Élève sans nom')}</strong><span class="font-bold ${r.status === 'approved' ? 'text-emerald-700' : 'text-rose-700'}">${r.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></div><p class="text-slate-500 mt-1">${escapeHtml(r.email || '')} • ${escapeHtml(r.serie || '')} • ${r.createdAt ? new Date(r.createdAt).toLocaleString('fr-FR') : ''}</p></div>`).join('')}</div></details>` : '';
+                registrationContainer.innerHTML = (cards.length ? cards.join('') : '<div class="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500">Aucune inscription élève en attente de validation.</div>') + history;
+                }
+                const count = document.getElementById('admin-inbox-student-count'); if (count) count.textContent = profileResult.error ? '!' : pending.length.toLocaleString('fr-FR');
             }
             // Liste des abonnements
             const subContainer = document.getElementById('admin-subscriptions-list');
@@ -4509,7 +4569,6 @@
                     </form>
                 </div>
             `).join('');
-            if (typeof renderRoleAdminLists === 'function') await renderRoleAdminLists();
             if (typeof loadAdminRoleMessages === 'function') await loadAdminRoleMessages();
         }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-akademia-school-shell-v12-supervision-course-greeting';
+const CACHE_NAME = 'smart-akademia-school-shell-v14-admin-validation-inbox';
 const APP_SHELL = [
   './', './index.html', './administration.html', './role-portal.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './assets/smart-akademia-emblem.webp', './assets/smart-akademia-logo-complet.webp'

@@ -44,7 +44,7 @@ Avant le premier accès, résultat attendu : `role = admin`, `series = Administr
 
 ### Positifs
 
-- Se connecter au portail `/administration.html` avec `akademia` et le mot de passe saisi dans Supabase Auth.
+- Se connecter depuis le formulaire commun à la racine avec `akademia` et le mot de passe du compte Auth associé à l’adresse configurée. Tous les rôles utilisent le même bouton de connexion.
 - Vérifier l'écran de première connexion, puis changer le mot de passe.
 - Vérifier que le tableau de bord s'ouvre seulement après la confirmation serveur.
 
@@ -58,3 +58,10 @@ Avant le premier accès, résultat attendu : `role = admin`, `series = Administr
 ## État du test au 14 novembre 2026
 
 La syntaxe JavaScript, le manifeste et les chemins des ressources PWA ont été vérifiés statiquement. Le profil administrateur a été signalé comme `admin` dans le projet lors des étapes précédentes. En revanche, aucune connexion Auth réelle, aucun changement de mot de passe et aucun contrôle RLS distant n'ont été réalisés depuis l'environnement de préparation. Le propriétaire doit effectuer ces essais lui-même ; il ne doit jamais transmettre son mot de passe.
+
+
+## Diagnostic rapide
+
+Exécuter `supabase/diagnostics/10_DIAGNOSTIC_CONNEXION_ADMIN.sql` dans le SQL Editor. Il indique si l'utilisateur Auth existe, si l'e-mail est confirmé, si le profil est admin et si un changement initial du mot de passe reste obligatoire. Il ne peut pas lire ni valider le mot de passe.
+
+L'identifiant `akademia` est un alias, pas un utilisateur Supabase distinct. Dans cette version, il pointe vers `julio7271@gmail.com`. Si le compte Auth de l'administrateur utilise un autre e-mail, le propriétaire doit harmoniser cet e-mail dans le paramètre `SUPABASE_CONFIG.adminEmail` et dans `akademia_admin_allowlist`, sans publier de mot de passe.

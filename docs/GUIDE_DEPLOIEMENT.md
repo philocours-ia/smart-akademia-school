@@ -25,7 +25,7 @@
 ## 2. Portes d'entrée et contrôle d'accès
 
 - **Élèves :** racine du site, `/` ou `/index.html`.
-- **Administration :** `/administration.html`, qui redirige vers le portail dédié de l'application.
+- **Tous les profils :** même formulaire de connexion à la racine du site. L’administrateur saisit `akademia`; les autres profils saisissent leur adresse e-mail. Le rôle Supabase décide de l’espace ouvert.
 - Aucun lien ni bouton administrateur n'est affiché dans les menus élève.
 - L'URL d'administration n'est pas une protection. Le rôle `admin` est attribué côté base uniquement à l'adresse autorisée par la table privée `akademia_admin_allowlist` ; le rôle n'est jamais accepté depuis les métadonnées envoyées par le navigateur.
 - Après connexion, le profil Supabase doit avoir `role = 'admin'`. Le mot de passe initial doit être changé ; le trigger `auth.users` ne lève le verrou qu'après changement effectif du hash Auth. L'application appelle ensuite `rpc('is_admin')` avant d'afficher le tableau de bord.
@@ -83,7 +83,7 @@ Netlify fournit un domaine HTTPS de test. Pour un domaine personnalisé, le ratt
 - Android : ouvrir le domaine HTTPS dans Chrome → menu ⋮ → Installer l'application ou Ajouter à l'écran d'accueil.
 - iPhone : ouvrir le domaine HTTPS dans Safari → Partager → Sur l'écran d'accueil.
 
-Le manifeste référence les icônes 192×192 et 512×512, et le service worker renouvelle le cache avec le nom `smart-akademia-school-shell-v12-supervision-course-greeting`. Après une mise à jour, fermer puis rouvrir l'application installée si l'ancien cache reste visible.
+Le manifeste référence les icônes 192×192 et 512×512, et le service worker renouvelle le cache avec le nom `smart-akademia-school-shell-v13-single-login-preregister-proofs`. Après une mise à jour, fermer puis rouvrir l'application installée si l'ancien cache reste visible.
 
 **Limite hors ligne :** le shell statique et les icônes sont mis en cache ; Supabase, les comptes, les paiements, les cours et les CDN nécessitent Internet. Ne pas présenter cette PWA comme un mode hors ligne complet.
 
@@ -92,7 +92,7 @@ Le manifeste référence les icônes 192×192 et 512×512, et le service worker 
 ### Élèves : inscription annuelle et accès aux cours
 
 - Les séries proposées sont Seconde, Première L/S/OSE et Terminale L/S/OSE. Le profil générique `Première` est conservé uniquement pour reprise/diagnostic et doit être affecté à une série par l’administration.
-- À la création Auth, le nouvel élève est `pending`. Il se connecte au portail restreint et transmet sa photo d’identité, son reçu MVola et l’identifiant de transaction pour le droit annuel de **2 000 Ar**, avec la référence `AKADEMIA_DROIT`, au **0385528349 — Nasandratriniaina Julio**.
+- Le formulaire d’inscription demande avant la création du compte la photo d’identité, le reçu MVola et l’identifiant de transaction pour le droit annuel de **2 000 Ar**, avec la référence `AKADEMIA_DROIT`, au **0385528349 — Nasandratriniaina Julio**. Si la confirmation e-mail est activée, les pièces sont temporairement conservées dans IndexedDB et téléversées après la première connexion sur le même navigateur.
 - Les fichiers du dossier annuel sont placés dans le bucket privé `student-enrollment-documents`. La validation par l’administrateur vérifie côté SQL que les deux fichiers existent réellement avant de changer le profil à `approved`. Le paiement demeure une vérification humaine à partir du reçu et de l’historique MVola.
 - La vérification faciale/KYC n'est pas activée. Aucun scan facial ni donnée biométrique n'est demandé ou traité par cette version ; un prestataire, une base légale, un consentement explicite et une politique de conservation seront nécessaires avant d'ajouter ce contrôle.
 - Les cours complets restent accessibles après abonnement validé : **15 000 Ar pour 30 jours** ou **145 000 Ar pour l’année scolaire**. Moyens acceptés : MVola `0385528349` ou Binance Pay `820751129`, référence obligatoire `AKADEMIA`, preuve et identifiant de transaction requis.
@@ -103,7 +103,7 @@ Le manifeste référence les icônes 192×192 et 512×512, et le service worker 
 
 - Les comptes candidats sont enregistrés sous le rôle limité `applicant`. Le rôle final n'est attribué qu'après décision admin côté SQL.
 - **Enseignant :** nom, e-mail, téléphone, spécialité proposée, diplôme, photo d'identité et preuve du diplôme. L'administrateur vérifie le dossier, confirme le nom de matière d'après les PE/RAPE retenus et affecte le professeur à une ou plusieurs séries. L'approbation et l'affectation sont regroupées dans une RPC transactionnelle.
-- **Partenaire :** le nom de la personne/organisation et l'acceptation de la contribution mensuelle de **100 000 Ar** sont requis. Après approbation de la candidature, le partenaire transmet une preuve et une référence de transaction avec `FINANCEMENT` par MVola ou Binance Pay. L'administrateur vérifie le justificatif et saisit la date réelle de fin d'année scolaire. Le système émet un ticket numérique à six chiffres ; il ne remplace jamais la connexion Supabase Auth. L'accès d'audit aux cours est conditionné par une cotisation active et un ticket annuel valide.
+- **Partenaire :** le nom de la personne/organisation, l'acceptation de la contribution mensuelle de **100 000 Ar**, le mode de paiement, l'identifiant de transaction et la preuve du premier versement sont exigés dans le formulaire initial, avant la création du compte. Le dossier et le justificatif sont transférés dans un bucket privé après la première session Auth. Après approbation de la candidature, une cotisation en attente est créée ; l'administrateur vérifie séparément le justificatif et la valide. Le ticket numérique à six chiffres n'est généré qu'après validation du paiement et saisie de la date réelle de fin d'année scolaire ; il ne remplace jamais la connexion Supabase Auth. L'accès d'audit aux cours est conditionné par une cotisation active et un ticket annuel valide.
 - **Promoteur :** niveau Bac minimum avec photo et preuve de diplôme. Après approbation, un code de parrainage de huit caractères est attribué. Une commission de **1 000 Ar** est inscrite lorsque l'élève référé a lui-même obtenu l'approbation de son inscription. Le seuil de demande de paiement est **30 000 Ar**.
 - Les pièces des candidatures et les reçus partenaires sont stockés dans des buckets privés. Les URL signées utilisées par l'administration expirent après 15 minutes. Des politiques Storage restrictives supplémentaires empêchent des politiques permissives héritées d'ouvrir ces buckets par inadvertance.
 
@@ -190,3 +190,24 @@ La recette métier complète, avec tests positifs et négatifs par rôle, est d�
 La migration `09_SUPERVISION_ET_ENSEIGNANTS_COURS.sql` doit être appliquée après 01–08. Elle expose les métriques agrégées du Centre de supervision via `get_akademia_admin_supervision()`, RPC réservée à `public.is_admin()`. Le montant mensuel affiche les paiements qui ont été marqués comme approuvés dans la base (droits élèves, abonnements et contributions partenaires) ; il ne prouve pas à lui seul un encaissement externe et aucun virement n’est effectué automatiquement.
 
 Lorsqu’un élève approuvé consulte le parcours Philosophie, le portail affiche une salutation personnalisée. Le nom du responsable est lu dans les affectations actives `teacher_subject_assignments` et ne s’affiche que si un enseignant approuvé est affecté à la série du profil. En l’absence d’affectation, l’interface l’indique au lieu d’inventer un nom. L’approbation d’une candidature enseignant et son affectation doivent être finalisées par l’administration.
+
+
+## Mise à jour 10 — justificatifs requis en amont
+
+Exécuter `supabase/migrations/10_PREUVES_AVANT_INSCRIPTION_ET_PARTENAIRE.sql` après les migrations 01 à 09, seulement si elle n'est pas déjà appliquée. Elle permet au candidat partenaire de téléverser la première preuve dans le bucket privé alors que son profil a encore le rôle `applicant`. Lorsqu'une candidature partenaire est approuvée, la cotisation de 100 000 Ar est inscrite en `pending`; l'administrateur doit ensuite examiner le justificatif dans la section des cotisations et décider séparément. Le ticket partenaire n'est donc pas émis au seul moment de l'approbation de candidature.
+
+Le formulaire initial des enseignants/promoteurs exige photo d'identité et justificatif de diplôme. Celui des partenaires exige le justificatif de la première cotisation, le mode de paiement, l'identifiant de transaction et `FINANCEMENT`. L'administration peut ouvrir les preuves via des URL signées temporaires.
+
+### Connexion administrateur par le formulaire commun
+
+Le formulaire de connexion est commun à tous les rôles. Pour l'administrateur, l'identifiant saisi est `akademia`; le site le mappe vers l'adresse de compte Auth définie par `SUPABASE_CONFIG.adminEmail`. Dans la livraison actuelle, cette adresse est `julio7271@gmail.com` et doit correspondre à l'adresse inscrite dans `akademia_admin_allowlist`. L'accès au tableau de bord exige ensuite `profiles.role='admin'` et le RPC `is_admin()`. Si l'accès échoue, exécuter `supabase/diagnostics/10_DIAGNOSTIC_CONNEXION_ADMIN.sql`; ce diagnostic ne vérifie pas le mot de passe.
+
+
+## 11. Correctif du formulaire d'inscription et de la connexion unique (14 novembre 2026)
+
+- Le site n'affiche qu'un seul formulaire de connexion, avec le bouton **Se connecter** pour tous les rôles. Le profil réellement lu depuis `public.profiles` détermine la destination après l'authentification. Aucun rôle administratif n'est accordé par le seul alias saisi.
+- L'administrateur saisit `akademia` dans le champ « Adresse e-mail ou identifiant ». Cet alias est mappé vers `SUPABASE_CONFIG.adminEmail`, actuellement `julio7271@gmail.com`. Si l'adresse réellement provisionnée dans Supabase Auth est différente, harmoniser cette valeur et `akademia_admin_allowlist` avec le propriétaire du projet. Ne jamais communiquer un mot de passe dans le chat ou dans le dépôt.
+- Les élèves joignent photo d'identité, preuve du droit MVola de 2 000 Ar et référence de transaction avant l'appel `signUp`. Les enseignants/promoteurs joignent photo et preuve de diplôme avant `signUp`. Les partenaires joignent preuve du versement initial de 100 000 Ar, mode de paiement, référence de transaction et référence `FINANCEMENT` avant `signUp`.
+- Lorsque Supabase exige la confirmation d'e-mail et n'ouvre pas de session immédiatement, les fichiers sont provisoirement gardés dans IndexedDB du navigateur courant puis téléversés après la connexion. Utiliser le même navigateur et un appareil personnel. Ce stockage local temporaire n'est pas chiffré par l'application.
+- Sur une base où 01 à 09 ont déjà été appliquées, exécuter uniquement `supabase/migrations/10_PREUVES_AVANT_INSCRIPTION_ET_PARTENAIRE.sql` si elle n'est pas déjà appliquée. Ne pas rejouer les migrations précédentes.
+- Si la connexion admin échoue, exécuter en lecture seule `supabase/diagnostics/10_DIAGNOSTIC_CONNEXION_ADMIN.sql`. Vérifier `AUTH_USER_ABSENT`, e-mail non confirmé, profil manquant, rôle différent de `admin` ou adresse non présente/activée dans l'allowlist. Le diagnostic ne lit jamais le mot de passe et ne peut pas confirmer qu'il est correct.

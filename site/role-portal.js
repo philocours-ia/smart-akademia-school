@@ -2,6 +2,129 @@
 let pendingCandidateType = '';
 const AKADEMIA_SERIES = ['Seconde', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'];
 
+
+// Les fichiers sont sélectionnés avant l'inscription puis conservés temporairement
+// dans IndexedDB sur le même navigateur si Supabase exige une confirmation e-mail.
+const PENDING_EVIDENCE_DB = 'smart-akademia-school-pending-evidence';
+const PENDING_EVIDENCE_STORE = 'drafts';
+function openPendingEvidenceDb() {
+    return new Promise((resolve, reject) => {
+        if (!('indexedDB' in window)) return reject(new Error('Le stockage local sécurisé du navigateur est indisponible. Activez IndexedDB ou essayez un navigateur récent.'));
+        const request = indexedDB.open(PENDING_EVIDENCE_DB, 1);
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(PENDING_EVIDENCE_STORE)) db.createObjectStore(PENDING_EVIDENCE_STORE, { keyPath: 'email' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Impossible d’ouvrir le stockage temporaire des justificatifs.'));
+    });
+}
+async function savePendingSignupEvidence(email, payload) {
+    const db = await openPendingEvidenceDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(PENDING_EVIDENCE_STORE, 'readwrite');
+        tx.objectStore(PENDING_EVIDENCE_STORE).put({ ...payload, email: email.trim().toLowerCase() });
+        tx.oncomplete = () => { db.close(); resolve(true); };
+        tx.onerror = () => { db.close(); reject(tx.error || new Error('Impossible de conserver temporairement les pièces sélectionnées.')); };
+    });
+}
+async function getPendingSignupEvidence(email) {
+    const db = await openPendingEvidenceDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(PENDING_EVIDENCE_STORE, 'readonly');
+        const req = tx.objectStore(PENDING_EVIDENCE_STORE).get(email.trim().toLowerCase());
+        req.onsuccess = () => { const value = req.result || null; db.close(); resolve(value); };
+        req.onerror = () => { db.close(); reject(req.error || new Error('Impossible de relire les pièces temporaires.')); };
+    });
+}
+async function deletePendingSignupEvidence(email) {
+    const db = await openPendingEvidenceDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(PENDING_EVIDENCE_STORE, 'readwrite');
+        tx.objectStore(PENDING_EVIDENCE_STORE).delete(email.trim().toLowerCase());
+        tx.oncomplete = () => { db.close(); resolve(true); };
+        tx.onerror = () => { db.close(); reject(tx.error || new Error('Impossible d’effacer les pièces temporaires.')); };
+    });
+}
+async function processPendingSignupEvidence(profile) {
+    if (!profile?.id || !profile?.email || !supabaseClient) return false;
+    const draft = await getPendingSignupEvidence(profile.email);
+    if (!draft) return false;
+
+    if (draft.kind === 'student' && profile.role === 'student') {
+        const { data: existing, error: lookupError } = await supabaseClient.from('student_enrollment_submissions')
+            .select('id,status').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(1);
+        if (lookupError) throw lookupError;
+        if (existing?.[0]?.status === 'pending' || existing?.[0]?.status === 'approved') { await deletePendingSignupEvidence(profile.email); return true; }
+        validatePrivateFile(draft.identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+        validatePrivateFile(draft.paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+        let identityPath = null, proofPath = null;
+        try {
+            identityPath = await uploadRoleFile('student-enrollment-documents', profile.id, draft.identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+            proofPath = await uploadRoleFile('student-enrollment-documents', profile.id, draft.paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            const { error } = await supabaseClient.from('student_enrollment_submissions').insert({
+                user_id: profile.id, amount_ar: 2000, payment_method: 'MVola', payment_reference: 'AKADEMIA_DROIT',
+                transaction_reference: draft.transactionReference, identity_photo_path: identityPath, payment_proof_path: proofPath
+            });
+            if (error) throw error;
+            await deletePendingSignupEvidence(profile.email);
+            return true;
+        } catch (error) {
+            const cleanup = [];
+            if (identityPath) cleanup.push(supabaseClient.storage.from('student-enrollment-documents').remove([identityPath]));
+            if (proofPath) cleanup.push(supabaseClient.storage.from('student-enrollment-documents').remove([proofPath]));
+            if (cleanup.length) await Promise.allSettled(cleanup);
+            throw error;
+        }
+    }
+
+    if (draft.kind === 'applicant' && profile.role === 'applicant' && profile.requestedRole === draft.applicantType) {
+        if (draft.uploadedPaths) return true;
+        const uploadedPaths = {};
+        const newlyUploaded = [];
+        try {
+        if (['teacher','promoter'].includes(draft.applicantType)) {
+            validatePrivateFile(draft.identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+            validatePrivateFile(draft.diplomaFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            uploadedPaths.identity_photo = await uploadRoleFile('role-application-documents', profile.id, draft.identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+            newlyUploaded.push(['role-application-documents', uploadedPaths.identity_photo]);
+            uploadedPaths.diploma_proof = await uploadRoleFile('role-application-documents', profile.id, draft.diplomaFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            newlyUploaded.push(['role-application-documents', uploadedPaths.diploma_proof]);
+        } else if (draft.applicantType === 'partner') {
+            validatePrivateFile(draft.paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            uploadedPaths.payment_proof = await uploadRoleFile('partner-payment-proofs', profile.id, draft.paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            newlyUploaded.push(['partner-payment-proofs', uploadedPaths.payment_proof]);
+        } else return false;
+        // On conserve les chemins privés et les références, pas les fichiers locaux après transfert réussi.
+        await savePendingSignupEvidence(profile.email, {
+            kind: 'applicant', applicantType: draft.applicantType, paymentMethod: draft.paymentMethod || null,
+            transactionReference: draft.transactionReference || null, uploadedPaths, createdAt: draft.createdAt || new Date().toISOString()
+        });
+        return true;
+        } catch (error) {
+            await Promise.allSettled(newlyUploaded.map(([bucket, path]) => supabaseClient.storage.from(bucket).remove([path])));
+            throw error;
+        }
+    }
+    return false;
+}
+
+function candidateEvidenceFields(type) {
+    if (type === 'teacher' || type === 'promoter') {
+        return `<p class="text-xs font-bold text-amber-950">Dossier obligatoire avant création du compte</p>
+            <div><label class="block text-xs font-bold mb-1" for="applicant-identity-file">Photo d’identité</label><input id="applicant-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"><p class="text-[10px] text-slate-500">JPG, PNG ou WEBP — 10 Mo maximum.</p></div>
+            <div><label class="block text-xs font-bold mb-1" for="applicant-diploma-file">Preuve du diplôme</label><input id="applicant-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"><p class="text-[10px] text-slate-500">Photo lisible ou PDF — 10 Mo maximum.</p></div>
+            ${type === 'promoter' ? '<p class="text-[11px] text-amber-900">Diplôme minimum exigé : Baccalauréat.</p>' : ''}`;
+    }
+    if (type === 'partner') {
+        return `<p class="text-xs font-bold text-amber-950">Justificatif de la première cotisation mensuelle : 100 000 Ar</p>
+            <div><label class="block text-xs font-bold mb-1" for="applicant-partner-payment-method">Mode de paiement</label><select id="applicant-partner-payment-method" required class="auth-input"><option value="">Choisir un mode de paiement</option><option value="MVola">MVola — 0385528349</option><option value="Binance Pay">Binance Pay — 820751129</option></select></div>
+            <div><label class="block text-xs font-bold mb-1" for="applicant-partner-transaction-reference">Référence / identifiant de transaction</label><input id="applicant-partner-transaction-reference" required minlength="3" maxlength="120" class="auth-input" placeholder="Identifiant figurant sur le reçu"></div>
+            <div><label class="block text-xs font-bold mb-1" for="applicant-partner-proof-file">Preuve de paiement</label><input id="applicant-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"><p class="text-[10px] text-slate-500">Image ou PDF — 10 Mo maximum. Référence obligatoire : FINANCEMENT.</p></div>`;
+    }
+    return '';
+}
+
 function openApplicantSignup(type) {
     if (!['teacher', 'partner', 'promoter'].includes(type)) return;
     if (!supabaseClient) return showToast('Supabase doit être configuré avant de créer un compte candidat.', 'error');
@@ -9,6 +132,8 @@ function openApplicantSignup(type) {
     const labels = { teacher: 'Candidature enseignant', partner: 'Candidature partenaire', promoter: 'Candidature promoteur' };
     document.getElementById('applicant-signup-type').value = type;
     document.getElementById('applicant-signup-title').textContent = labels[type];
+    const evidenceFields = document.getElementById('applicant-evidence-fields');
+    if (evidenceFields) evidenceFields.innerHTML = candidateEvidenceFields(type);
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('applicant-signup-screen').classList.remove('hidden');
     document.getElementById('applicant-signup-screen').scrollIntoView({ behavior: 'instant', block: 'start' });
@@ -32,25 +157,51 @@ async function handleApplicantSignup(e) {
     if (!['teacher', 'partner', 'promoter'].includes(type)) return showToast('Type de candidature invalide.', 'error');
     if (password.length < 12) return showToast('Le mot de passe doit contenir au moins 12 caractères.', 'error');
     if (password !== confirm) return showToast('Les deux mots de passe ne correspondent pas.', 'error');
+    const draft = { kind: 'applicant', applicantType: type, createdAt: new Date().toISOString() };
+    let accountCreated = false;
     try {
+        if (type === 'teacher' || type === 'promoter') {
+            draft.identityFile = document.getElementById('applicant-identity-file')?.files[0];
+            draft.diplomaFile = document.getElementById('applicant-diploma-file')?.files[0];
+            validatePrivateFile(draft.identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+            validatePrivateFile(draft.diplomaFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+        } else {
+            draft.paymentMethod = document.getElementById('applicant-partner-payment-method')?.value;
+            draft.transactionReference = document.getElementById('applicant-partner-transaction-reference')?.value.trim();
+            draft.paymentProofFile = document.getElementById('applicant-partner-proof-file')?.files[0];
+            if (!['MVola','Binance Pay'].includes(draft.paymentMethod)) throw new Error('Choisissez MVola ou Binance Pay pour la cotisation partenaire.');
+            if ((draft.transactionReference || '').length < 3) throw new Error('La référence de transaction est obligatoire.');
+            validatePrivateFile(draft.paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+        }
+        await savePendingSignupEvidence(email, draft);
         const { data, error } = await supabaseClient.auth.signUp({
             email, password,
             options: { data: { full_name: name, phone, account_kind: 'applicant', candidate_type: type } }
         });
         if (error) throw error;
+        accountCreated = !!data.user;
         e.target.reset();
         document.getElementById('applicant-signup-screen').classList.add('hidden');
         if (data.session && data.user) {
-            const profile = await getCloudProfile(data.user.id);
+            let profile = await getCloudProfile(data.user.id);
+            await processPendingSignupEvidence(profile);
+            profile = await getCloudProfile(data.user.id);
             await openRolePortal(profile);
-            showToast('Compte candidat créé. Complétez maintenant votre dossier de candidature.', 'success');
+            showToast('Compte candidat créé. Les justificatifs sélectionnés avant l’inscription ont été transférés dans l’espace privé.', 'success');
         } else {
             document.getElementById('auth-screen').classList.remove('hidden');
             showAuthPanel('login');
-            showToast('Compte candidat créé. Confirmez votre adresse e-mail, puis connectez-vous avec ce compte pour compléter le dossier.', 'info');
+            showToast('Compte candidat créé. Confirmez votre e-mail, puis connectez-vous depuis ce même navigateur : les justificatifs seront transférés dans le stockage privé avant le dépôt final.', 'info');
         }
     } catch (error) {
-        showToast(error.message || 'Impossible de créer le compte candidat.', 'error');
+        if (accountCreated) {
+            document.getElementById('applicant-signup-screen').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+            showAuthPanel('login');
+            showToast(`Compte candidat créé, mais le transfert des justificatifs reste à terminer. Connectez-vous depuis ce même navigateur pour réessayer. ${error.message || ''}`, 'error');
+        } else {
+            showToast(error.message || 'Impossible de créer le compte candidat.', 'error');
+        }
     }
 }
 
@@ -65,7 +216,6 @@ async function openRolePortal(profile) {
     state.isAdmin = false;
     document.body.classList.remove('admin-mode');
     document.getElementById('auth-screen').classList.add('hidden');
-    document.getElementById('admin-auth-screen').classList.add('hidden');
     document.getElementById('admin-password-change-screen').classList.add('hidden');
     document.getElementById('app-shell').classList.add('hidden');
     document.getElementById('applicant-signup-screen').classList.add('hidden');
@@ -228,18 +378,22 @@ async function renderApplicantWorkspace(host, user) {
         return;
     }
     const label = type === 'teacher' ? 'Candidature enseignant' : type === 'partner' ? 'Candidature partenaire' : 'Candidature promoteur';
+    const evidenceDraft = await getPendingSignupEvidence(user.email).catch(() => null);
+    const paths = evidenceDraft?.uploadedPaths || {};
+    const hasTeacherProofs = !!(paths.identity_photo && paths.diploma_proof);
+    const hasPartnerProof = !!paths.payment_proof;
     let typeFields = '';
     if (type === 'teacher') {
         typeFields = `<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label><input id="candidate-specialty" required maxlength="120" class="auth-input" placeholder="Intitulé exact figurant dans votre PE de référence"><p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE retenus. Aucun catalogue officiel non vérifié n’est présélectionné.</p></div>
         <div><label class="block text-xs font-bold mb-1">Diplôme le plus élevé</label><input id="candidate-diploma-level" required maxlength="120" class="auth-input" placeholder="Intitulé du diplôme"></div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>`;
+        ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues avant la création du compte et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Les justificatifs doivent être déposés avant l’envoi de la candidature. Votre compte est antérieur au nouveau formulaire : vous pouvez joindre les deux pièces ci-dessous.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
     } else if (type === 'promoter') {
         typeFields = `<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label><select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option><option>Baccalauréat</option><option>Bac+2</option><option>Licence</option><option>Master</option><option>Doctorat</option></select><p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>`;
+        ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues avant la création du compte et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Les justificatifs doivent être déposés avant l’envoi de la candidature. Votre compte est antérieur au nouveau formulaire : joignez les deux pièces ci-dessous.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
     } else {
         typeFields = `<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label><input id="candidate-organization" required maxlength="180" class="auth-input" value="${escapeHtml(user.name || '')}"></div>
-        <label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5"> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme, après approbation de ma candidature.</label>
-        <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La validation de la candidature ne vaut pas validation d’un paiement. Le justificatif de cotisation et la référence <strong>FINANCEMENT</strong> seront demandés dans l’espace partenaire.</div>`;
+        <label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5"> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme.</label>
+        ${hasPartnerProof ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Preuve de la première cotisation, mode de paiement et référence reçus avant la création du compte.</div>' : '<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La preuve de la première cotisation mensuelle de 100 000 Ar et la référence FINANCEMENT sont obligatoires avant le dépôt de candidature.</div><div><label class="block text-xs font-bold mb-1">Mode de paiement</label><select id="candidate-partner-payment-method" required class="auth-input"><option value="">Choisir</option><option value="MVola">MVola</option><option value="Binance Pay">Binance Pay</option></select></div><div><label class="block text-xs font-bold mb-1">Référence de transaction</label><input id="candidate-partner-transaction-reference" required minlength="3" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve de paiement</label><input id="candidate-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>'}`;
     }
     host.innerHTML = `<div class="bg-white rounded-2xl p-5 md:p-7 border border-slate-200 space-y-4">
         <div><p class="text-xs uppercase tracking-widest font-bold text-gold-600">Dossier à compléter</p><h2 class="font-display text-xl font-bold text-navy-900 mt-1">${label}</h2><p class="text-sm text-slate-600 mt-2">Compte : ${escapeHtml(user.email)} • ${escapeHtml(user.phone || 'Téléphone non renseigné')}</p></div>
@@ -280,24 +434,46 @@ async function submitRoleApplication(e) {
     try {
         let specialty = null, diplomaLevel = null, organizationName = null, commitment = false;
         const documents = [];
+        const draft = await getPendingSignupEvidence(user.email).catch(() => null);
+        const paths = draft?.uploadedPaths || {};
         if (type === 'teacher') {
             specialty = document.getElementById('candidate-specialty').value.trim();
             diplomaLevel = document.getElementById('candidate-diploma-level').value.trim();
-            const identity = document.getElementById('candidate-identity-file').files[0];
-            const diploma = document.getElementById('candidate-diploma-file').files[0];
-            documents.push({ kind: 'identity_photo', path: await uploadRoleFile('role-application-documents', user.id, identity, 10*1024*1024, ['image/jpeg','image/png','image/webp']) });
-            documents.push({ kind: 'diploma_proof', path: await uploadRoleFile('role-application-documents', user.id, diploma, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']) });
+            let identityPath = paths.identity_photo, diplomaPath = paths.diploma_proof;
+            if (!identityPath || !diplomaPath) {
+                const identity = document.getElementById('candidate-identity-file')?.files[0];
+                const diploma = document.getElementById('candidate-diploma-file')?.files[0];
+                identityPath = await uploadRoleFile('role-application-documents', user.id, identity, 10*1024*1024, ['image/jpeg','image/png','image/webp']);
+                diplomaPath = await uploadRoleFile('role-application-documents', user.id, diploma, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            }
+            documents.push({ kind: 'identity_photo', path: identityPath }, { kind: 'diploma_proof', path: diplomaPath });
         } else if (type === 'promoter') {
             diplomaLevel = document.getElementById('candidate-diploma-level').value;
             if (!['Baccalauréat','Bac+2','Licence','Master','Doctorat'].includes(diplomaLevel)) throw new Error('Le diplôme minimum requis est le Baccalauréat.');
-            const identity = document.getElementById('candidate-identity-file').files[0];
-            const diploma = document.getElementById('candidate-diploma-file').files[0];
-            documents.push({ kind: 'identity_photo', path: await uploadRoleFile('role-application-documents', user.id, identity, 10*1024*1024, ['image/jpeg','image/png','image/webp']) });
-            documents.push({ kind: 'diploma_proof', path: await uploadRoleFile('role-application-documents', user.id, diploma, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']) });
+            let identityPath = paths.identity_photo, diplomaPath = paths.diploma_proof;
+            if (!identityPath || !diplomaPath) {
+                const identity = document.getElementById('candidate-identity-file')?.files[0];
+                const diploma = document.getElementById('candidate-diploma-file')?.files[0];
+                identityPath = await uploadRoleFile('role-application-documents', user.id, identity, 10*1024*1024, ['image/jpeg','image/png','image/webp']);
+                diplomaPath = await uploadRoleFile('role-application-documents', user.id, diploma, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            }
+            documents.push({ kind: 'identity_photo', path: identityPath }, { kind: 'diploma_proof', path: diplomaPath });
         } else if (type === 'partner') {
             organizationName = document.getElementById('candidate-organization').value.trim();
             commitment = document.getElementById('candidate-partner-commitment').checked;
             if (!commitment) throw new Error('Vous devez accepter la cotisation mensuelle annoncée.');
+            let proofPath = paths.payment_proof;
+            let paymentMethod = draft?.paymentMethod;
+            let transactionReference = draft?.transactionReference;
+            if (!proofPath) {
+                paymentMethod = document.getElementById('candidate-partner-payment-method')?.value;
+                transactionReference = document.getElementById('candidate-partner-transaction-reference')?.value.trim();
+                const proofFile = document.getElementById('candidate-partner-proof-file')?.files[0];
+                if (!['MVola','Binance Pay'].includes(paymentMethod)) throw new Error('Choisissez MVola ou Binance Pay.');
+                if (!transactionReference || transactionReference.length < 3) throw new Error('La référence de transaction est obligatoire.');
+                proofPath = await uploadRoleFile('partner-payment-proofs', user.id, proofFile, 10*1024*1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            }
+            documents.push({ kind: 'payment_proof', path: proofPath, payment_method: paymentMethod, transaction_reference: transactionReference, payment_reference: 'FINANCEMENT', amount_ar: 100000 });
         } else throw new Error('Type de candidature non valide.');
 
         const { error } = await supabaseClient.from('role_applications').insert({
@@ -306,7 +482,8 @@ async function submitRoleApplication(e) {
             monthly_commitment_accepted: commitment, documents
         });
         if (error) throw error;
-        showToast('Candidature déposée. Son statut est maintenant « en attente ».', 'success');
+        await deletePendingSignupEvidence(user.email).catch(() => {});
+        showToast('Candidature déposée avec les justificatifs obligatoires. Validation administrative en attente.', 'success');
         await renderRolePortal();
     } catch (error) {
         showToast(error.message || 'Impossible de déposer la candidature.', 'error');
@@ -663,46 +840,89 @@ async function sendAdminRoleMessage(e) {
 
 async function renderRoleAdminLists() {
     if (!state.isAdmin || !supabaseClient) return;
-    const ids = ['admin-role-applications-list','admin-partner-contributions-list','admin-finance-requests-list','admin-staff-requests-list','admin-teacher-workday-list','admin-teacher-resources-list','admin-promoter-tracking-list'];
-    try {
-        const [apps, partners, finance, staff, teachers, resources, promotersResult, commissionsResult] = await Promise.all([
-            supabaseClient.from('role_applications').select('*').order('created_at',{ascending:false}),
-            supabaseClient.from('partner_contributions').select('*').order('created_at',{ascending:false}),
-            supabaseClient.from('finance_requests').select('*').order('created_at',{ascending:false}),
-            supabaseClient.from('staff_requests').select('*').order('created_at',{ascending:false}),
-            supabaseClient.from('profiles').select('id,full_name,email,series').eq('role','teacher').order('full_name'),
-            supabaseClient.from('teacher_resources').select('*').order('created_at',{ascending:false}),
-            supabaseClient.from('profiles').select('id,full_name,email,referral_code').eq('role','promoter').order('full_name'),
-            supabaseClient.from('promoter_commissions').select('promoter_id,student_id,amount_ar,created_at').order('created_at',{ascending:false})
-        ]);
-        const error = [apps,partners,finance,staff,teachers,resources,promotersResult,commissionsResult].find(x=>x.error)?.error;
-        if(error) throw error;
-        await renderAdminApplications(apps.data||[]);
-        await renderAdminPartnerContributions(partners.data||[]);
-        renderAdminFinanceRequests(finance.data||[]);
-        renderAdminStaffRequests(staff.data||[]);
-        renderAdminWorkdays(teachers.data||[]);
-        await renderAdminTeacherResources(resources.data||[]);
-        await renderAdminPromoters(promotersResult.data||[], commissionsResult.data||[]);
-    } catch(error) {
-        ids.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=`<p class="text-xs text-amber-800">Module non chargé. Vérifiez l’exécution de la migration 06. ${escapeHtml(error.message||'')}</p>`;});
+    const targets = {
+        applications: document.getElementById('admin-role-applications-list'),
+        partners: document.getElementById('admin-partner-contributions-list'),
+        finance: document.getElementById('admin-finance-requests-list'),
+        staff: document.getElementById('admin-staff-requests-list'),
+        workdays: document.getElementById('admin-teacher-workday-list'),
+        resources: document.getElementById('admin-teacher-resources-list'),
+        promoters: document.getElementById('admin-promoter-tracking-list')
+    };
+    const queries = await Promise.all([
+        supabaseClient.from('role_applications').select('*').order('created_at',{ascending:false}),
+        supabaseClient.from('partner_contributions').select('*').order('created_at',{ascending:false}),
+        supabaseClient.from('finance_requests').select('*').order('created_at',{ascending:false}),
+        supabaseClient.from('staff_requests').select('*').order('created_at',{ascending:false}),
+        supabaseClient.from('profiles').select('id,full_name,email,series').eq('role','teacher').order('full_name'),
+        supabaseClient.from('teacher_resources').select('*').order('created_at',{ascending:false}),
+        supabaseClient.from('profiles').select('id,full_name,email,referral_code').eq('role','promoter').order('full_name'),
+        supabaseClient.from('promoter_commissions').select('promoter_id,student_id,amount_ar,created_at').order('created_at',{ascending:false})
+    ]);
+    const [apps, partners, finance, staff, teachers, resources, promotersResult, commissionsResult] = queries;
+    const showError = (node, label, error) => { if (node) node.innerHTML = `<div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>${label} indisponible.</strong><br>${escapeHtml(error?.message || 'Vérifiez les droits RLS et les migrations Supabase correspondantes.')}</div>`; };
+
+    if (apps.error) showError(targets.applications, 'Candidatures professionnelles', apps.error);
+    else {
+        await renderAdminApplications(apps.data || []);
+        const count = document.getElementById('admin-inbox-professional-count');
+        if (count) count.textContent = (apps.data || []).filter(x => x.status === 'pending').length.toLocaleString('fr-FR');
     }
+
+    if (partners.error) showError(targets.partners, 'Cotisations partenaires', partners.error);
+    else {
+        await renderAdminPartnerContributions(partners.data || []);
+        const count = document.getElementById('admin-inbox-partner-count');
+        if (count) count.textContent = (partners.data || []).filter(x => x.status === 'pending').length.toLocaleString('fr-FR');
+    }
+
+    if (finance.error) showError(targets.finance, 'Demandes financières', finance.error);
+    else renderAdminFinanceRequests(finance.data || []);
+    if (staff.error) showError(targets.staff, 'Demandes administratives du personnel', staff.error);
+    else renderAdminStaffRequests(staff.data || []);
+    if (teachers.error) showError(targets.workdays, 'Journées de travail', teachers.error);
+    else renderAdminWorkdays(teachers.data || []);
+    if (resources.error) showError(targets.resources, 'Ressources des enseignants', resources.error);
+    else await renderAdminTeacherResources(resources.data || []);
+    if (promotersResult.error || commissionsResult.error) showError(targets.promoters, 'Suivi des promoteurs', promotersResult.error || commissionsResult.error);
+    else await renderAdminPromoters(promotersResult.data || [], commissionsResult.data || []);
 }
 
 async function renderAdminApplications(apps) {
-    const el=document.getElementById('admin-role-applications-list'); if(!el)return;
-    const pending=apps.filter(x=>x.status==='pending');
-    if(!pending.length){el.innerHTML='<p class="text-xs text-slate-500">Aucune candidature professionnelle en attente.</p>';return;}
-    const cards=[];
-    for(const a of pending){
-        const docs=Array.isArray(a.documents)?a.documents:[];
-        const links=[];
-        for(const d of docs){const {data}=await supabaseClient.storage.from('role-application-documents').createSignedUrl(d.path,900);if(data?.signedUrl)links.push(`<a class="text-xs text-indigo-700 underline mr-3" target="_blank" rel="noopener noreferrer" href="${escapeHtml(data.signedUrl)}">${d.kind==='identity_photo'?'Photo d’identité':'Preuve de diplôme'}</a>`);}
-        const assignment=a.application_type==='teacher'?`<div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2"><input name="subject" required value="${escapeHtml(a.specialty||'')}" placeholder="Matière à confirmer" class="auth-input"><div class="grid grid-cols-2 gap-1 text-[11px]">${AKADEMIA_SERIES.map(x=>`<label class="flex items-center gap-1"><input type="checkbox" name="series" value="${escapeHtml(x)}">${escapeHtml(x)}</label>`).join('')}</div><p class="md:col-span-2 text-[10px] text-slate-500">Confirmez la spécialité à partir des PE officiels avant l’affectation.</p></div>`:'';
-        cards.push(`<div class="rounded-xl border border-slate-200 p-4"><div class="flex flex-wrap justify-between gap-2"><div><p class="font-bold text-sm text-navy-900">${escapeHtml(a.applicant_name)}</p><p class="text-xs text-slate-600">${escapeHtml(a.applicant_email)} • ${escapeHtml(a.phone)} • ${escapeHtml(a.application_type)}</p><p class="text-xs text-slate-500 mt-1">${escapeHtml(a.specialty||a.organization_name||a.diploma_level||'')}</p><div class="mt-2">${links.join('')||'<span class="text-xs text-amber-700">Aucune pièce signée disponible.</span>'}</div></div><span class="text-[11px] text-amber-800">En attente</span></div>
-        <form class="mt-3 space-y-2" onsubmit="adminReviewRoleApplication(event,'${a.id}','${a.application_type}')">${assignment}<input name="note" class="auth-input" placeholder="Note interne (facultatif)"><div class="flex gap-2"><button name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Approuver</button><button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></div></form></div>`);
+    const el = document.getElementById('admin-role-applications-list');
+    if (!el) return;
+    const pending = apps.filter(x => x.status === 'pending');
+    const processed = apps.filter(x => x.status !== 'pending');
+    const typeLabel = type => ({ teacher: 'Enseignant', partner: 'Partenaire', promoter: 'Promoteur' }[type] || type || 'Candidature');
+    const cards = [];
+    for (const a of pending) {
+        const docs = Array.isArray(a.documents) ? a.documents : [];
+        const links = [];
+        const fileErrors = [];
+        for (const d of docs) {
+            const bucket = d.kind === 'payment_proof' ? 'partner-payment-proofs' : 'role-application-documents';
+            const label = d.kind === 'identity_photo' ? 'Photo d’identité' : d.kind === 'diploma_proof' ? 'Preuve du diplôme' : 'Preuve de cotisation';
+            if (!d.path) { fileErrors.push(label); continue; }
+            const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(d.path, 900);
+            if (data?.signedUrl) links.push(`<a class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100" target="_blank" rel="noopener noreferrer" href="${escapeHtml(data.signedUrl)}"><i class="fas fa-paperclip"></i>${label}</a>`);
+            else fileErrors.push(`${label}${error?.message ? ` : ${error.message}` : ''}`);
+        }
+        const hasDoc = kind => docs.some(d => d.kind === kind && !!d.path);
+        const expectedKinds = a.application_type === 'partner' ? ['payment_proof'] : ['identity_photo','diploma_proof'];
+        const allEvidenceAvailable = expectedKinds.every(kind => hasDoc(kind) && docs.some(d => d.kind === kind && links.some(link => link.includes(kind === 'identity_photo' ? 'Photo d’identité' : kind === 'diploma_proof' ? 'Preuve du diplôme' : 'Preuve de cotisation'))));
+        const payment = docs.find(d => d.kind === 'payment_proof') || {};
+        const assignment = a.application_type === 'teacher' ? `<div class="rounded-xl bg-indigo-50 border border-indigo-100 p-3 mt-3"><p class="text-xs font-bold text-indigo-950 mb-2">Affectation à confirmer avant approbation</p><div class="grid grid-cols-1 md:grid-cols-2 gap-2"><div><label class="block text-[10px] font-bold mb-1">Matière / spécialité</label><input name="subject" required value="${escapeHtml(a.specialty || '')}" placeholder="Matière à confirmer" class="auth-input"></div><div><span class="block text-[10px] font-bold mb-1">Séries concernées</span><div class="grid grid-cols-2 gap-1 text-[11px]">${AKADEMIA_SERIES.map(x => `<label class="flex items-center gap-1"><input type="checkbox" name="series" value="${escapeHtml(x)}">${escapeHtml(x)}</label>`).join('')}</div></div></div><p class="text-[10px] text-indigo-800 mt-2">Ne confirmez que les séries et la spécialité compatibles avec les PE/RAPE vérifiés.</p></div>` : '';
+        const teacherOrPromoter = ['teacher','promoter'].includes(a.application_type);
+        const paymentDetails = a.application_type === 'partner' ? `<div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-100 p-3"><p class="text-xs font-bold text-emerald-950">Première cotisation partenaire</p><div class="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1 text-xs text-emerald-900"><p>Montant : <strong>${Number(payment.amount_ar || 100000).toLocaleString('fr-FR')} Ar</strong></p><p>Mode : <strong>${escapeHtml(payment.payment_method || 'Non renseigné')}</strong></p><p>Référence : <strong>${escapeHtml(payment.payment_reference || 'Non renseignée')}</strong></p><p>Transaction : <strong class="font-mono">${escapeHtml(payment.transaction_reference || 'Non renseignée')}</strong></p><p>Engagement mensuel : <strong>${a.monthly_commitment_accepted ? 'Accepté' : 'Non confirmé'}</strong></p></div></div>` : '';
+        const missing = [];
+        if (teacherOrPromoter && !hasDoc('identity_photo')) missing.push('photo d’identité');
+        if (teacherOrPromoter && !hasDoc('diploma_proof')) missing.push('preuve du diplôme');
+        if (a.application_type === 'partner' && !hasDoc('payment_proof')) missing.push('preuve de la première cotisation');
+        const approvalAllowed = missing.length === 0 && allEvidenceAvailable;
+        cards.push(`<article class="rounded-xl border border-indigo-200 bg-white p-4 md:p-5 space-y-3 shadow-sm"><div class="flex flex-col lg:flex-row lg:justify-between gap-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h5 class="font-bold text-base text-navy-950">${escapeHtml(a.applicant_name || 'Nom non renseigné')}</h5><span class="rounded-full bg-amber-100 text-amber-900 px-2.5 py-1 text-[10px] font-bold">En attente</span><span class="rounded-full bg-indigo-100 text-indigo-900 px-2.5 py-1 text-[10px] font-bold">${typeLabel(a.application_type)}</span></div><div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 mt-2 text-xs text-slate-700"><p><span class="text-slate-500">E-mail :</span> ${escapeHtml(a.applicant_email || 'Non renseigné')}</p><p><span class="text-slate-500">Téléphone :</span> ${escapeHtml(a.phone || 'Non renseigné')}</p><p><span class="text-slate-500">Organisation :</span> ${escapeHtml(a.organization_name || 'Sans objet / non renseignée')}</p><p><span class="text-slate-500">Spécialité :</span> ${escapeHtml(a.specialty || 'Non renseignée')}</p><p><span class="text-slate-500">Diplôme :</span> ${escapeHtml(a.diploma_level || 'Non renseigné')}</p><p><span class="text-slate-500">Candidature déposée :</span> ${a.created_at ? new Date(a.created_at).toLocaleString('fr-FR') : 'Date inconnue'}</p><p class="sm:col-span-2 xl:col-span-3"><span class="text-slate-500">Référence du dossier :</span> <span class="font-mono">${escapeHtml(a.id)}</span></p></div>${paymentDetails}</div></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><p class="text-xs font-bold text-slate-800 mb-2">Pièces justificatives — ouvrir chaque document avant la décision</p><div class="flex flex-wrap gap-2">${links.join('') || '<span class="text-xs text-rose-700">Aucun justificatif consultable.</span>'}</div>${missing.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) manquante(s) : ${escapeHtml(missing.join(', '))}.</p>` : ''}${fileErrors.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) non consultable(s) : ${escapeHtml(fileErrors.join(' ; '))}. Vérifiez le bucket privé et les politiques Storage.</p>` : ''}</div>${assignment}<form class="space-y-2" onsubmit="adminReviewRoleApplication(event,'${a.id}','${a.application_type}')"><div><label class="block text-[10px] font-bold text-slate-600 mb-1">Note de décision (facultative)</label><textarea name="note" rows="2" maxlength="1000" class="auth-input" placeholder="Motif du refus, réserve ou commentaire administratif"></textarea></div><div class="flex flex-wrap items-center gap-2">${approvalAllowed ? `<button name="decision" value="approved" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold"><i class="fas fa-check mr-1"></i>Approuver la candidature</button>` : `<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-4 py-2.5 text-xs font-bold cursor-not-allowed">Approbation bloquée : justificatifs à vérifier</button>`}<button name="decision" value="rejected" class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2.5 text-xs font-bold">Refuser la candidature</button></div></form></article>`);
     }
-    el.innerHTML=cards.join('');
+    const processedHtml = processed.length ? `<details class="rounded-xl border border-slate-200 bg-slate-50 p-3"><summary class="cursor-pointer text-xs font-bold text-slate-700">Historique des candidatures déjà traitées (${processed.length})</summary><div class="space-y-2 mt-3">${processed.map(a => `<div class="rounded-lg border bg-white p-3 text-xs"><div class="flex flex-wrap justify-between gap-2"><strong>${escapeHtml(a.applicant_name || a.applicant_email || 'Candidat')} — ${typeLabel(a.application_type)}</strong><span class="font-bold ${a.status === 'approved' ? 'text-emerald-700' : 'text-rose-700'}">${a.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></div><p class="text-slate-500 mt-1">${escapeHtml(a.applicant_email || '')} • ${a.reviewed_at ? new Date(a.reviewed_at).toLocaleString('fr-FR') : ''}</p>${a.review_note ? `<p class="mt-1">Note : ${escapeHtml(a.review_note)}</p>` : ''}</div>`).join('')}</div></details>` : '';
+    el.innerHTML = (cards.length ? cards.join('') : '<div class="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500">Aucune candidature professionnelle en attente.</div>') + processedHtml;
 }
 
 async function adminReviewRoleApplication(e,id,type){
@@ -731,13 +951,13 @@ async function adminReviewRoleApplication(e,id,type){
 
 async function renderAdminPartnerContributions(rows){
     const el=document.getElementById('admin-partner-contributions-list');if(!el)return;
-    const pending=rows.filter(x=>x.status==='pending');if(!pending.length){el.innerHTML='<p class="text-xs text-slate-500">Aucune cotisation en attente.</p>';return;}
+    const pending=rows.filter(x=>x.status==='pending');const processed=rows.filter(x=>x.status!=='pending');if(!pending.length){el.innerHTML='<p class="text-xs text-slate-500">Aucune cotisation partenaire en attente.</p>'+(processed.length?`<details class="rounded-lg border p-3 mt-2"><summary class="cursor-pointer text-xs font-bold">Historique des cotisations (${processed.length})</summary><div class="mt-2 space-y-1">${processed.map(x=>`<p class="text-xs">${Number(x.amount_ar||0).toLocaleString('fr-FR')} Ar • ${escapeHtml(x.payment_method)} • ${escapeHtml(x.status)} • ${x.created_at?new Date(x.created_at).toLocaleString('fr-FR'):''}</p>`).join('')}</div></details>`:'');return;}
     const parts=[];
-    for(const x of pending){const {data:pr}=await supabaseClient.from('profiles').select('full_name,email').eq('id',x.user_id).maybeSingle();const {data}=await supabaseClient.storage.from('partner-payment-proofs').createSignedUrl(x.proof_path,900);
-      parts.push(`<div class="rounded-xl border p-3 space-y-2"><p class="text-xs font-bold">${escapeHtml(pr?.full_name||pr?.email||x.user_id)} • 100 000 Ar • ${escapeHtml(x.payment_method)}</p><p class="text-[11px]">Réf. ${escapeHtml(x.payment_reference)} • transaction ${escapeHtml(x.transaction_reference)}</p>${data?.signedUrl?`<a class="text-xs underline text-indigo-700" target="_blank" rel="noopener noreferrer" href="${escapeHtml(data.signedUrl)}">Consulter la preuve</a>`:'<span class="text-xs text-rose-700">Preuve privée indisponible</span>'}
-      <form class="flex flex-wrap gap-2" onsubmit="adminDecidePartnerContribution(event,'${x.id}')"><input name="ticket_until" type="date" class="auth-input max-w-48" aria-label="Fin de validité du ticket annuel"><button name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Valider la cotisation</button><button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></form><p class="text-[10px] text-slate-500">La date de fin du ticket doit correspondre à la fin réelle de l’année scolaire, confirmée par la direction.</p></div>`);
+    for(const x of pending){const {data:pr}=await supabaseClient.from('profiles').select('full_name,email,phone').eq('id',x.user_id).maybeSingle();const {data}=await supabaseClient.storage.from('partner-payment-proofs').createSignedUrl(x.proof_path,900);
+      parts.push(`<div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-2"><div class="flex flex-wrap items-center justify-between gap-2"><p class="text-sm font-bold">${escapeHtml(pr?.full_name||pr?.email||x.user_id)} • ${Number(x.amount_ar||100000).toLocaleString('fr-FR')} Ar</p><span class="text-[10px] rounded-full bg-amber-100 text-amber-900 px-2 py-1 font-bold">En attente</span></div><p class="text-xs text-slate-700">E-mail : ${escapeHtml(pr?.email||'Non renseigné')} • Téléphone : ${escapeHtml(pr?.phone||'Non renseigné')}</p><p class="text-xs">Mode : <strong>${escapeHtml(x.payment_method)}</strong> • Référence : <strong>${escapeHtml(x.payment_reference)}</strong></p><p class="text-xs">Transaction : <span class="font-mono">${escapeHtml(x.transaction_reference)}</span> • Déposée : ${x.created_at?new Date(x.created_at).toLocaleString('fr-FR'):'Date inconnue'}</p>${data?.signedUrl?`<a class="inline-flex text-xs underline font-bold text-indigo-700" target="_blank" rel="noopener noreferrer" href="${escapeHtml(data.signedUrl)}">Consulter la preuve de paiement</a>`:'<span class="text-xs text-rose-700">Preuve privée indisponible — vérifier Storage/RLS ; approbation bloquée.</span>'}
+      <form class="flex flex-wrap gap-2 items-end" onsubmit="adminDecidePartnerContribution(event,'${x.id}')"><label class="text-[10px] text-slate-600">Fin de validité du ticket annuel<input name="ticket_until" type="date" class="auth-input max-w-48 block" aria-label="Fin de validité du ticket annuel"></label>${data?.signedUrl?'<button name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Valider la cotisation</button>':'<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-3 py-2 text-xs font-bold">Validation bloquée</button>'}<button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></form><p class="text-[10px] text-slate-500">La date de fin du ticket doit correspondre à la fin réelle de l’année scolaire, confirmée par la direction.</p></div>`);
     }
-    el.innerHTML=parts.join('');
+    el.innerHTML=parts.join('')+(processed.length?`<details class="rounded-lg border p-3 mt-2"><summary class="cursor-pointer text-xs font-bold">Historique des cotisations traitées (${processed.length})</summary><div class="mt-2 space-y-1">${processed.map(x=>`<p class="text-xs">${Number(x.amount_ar||0).toLocaleString('fr-FR')} Ar • ${escapeHtml(x.payment_method)} • ${escapeHtml(x.status)} • ${x.created_at?new Date(x.created_at).toLocaleString('fr-FR'):''}</p>`).join('')}</div></details>`:'');
 }
 
 async function adminDecidePartnerContribution(e,id){
