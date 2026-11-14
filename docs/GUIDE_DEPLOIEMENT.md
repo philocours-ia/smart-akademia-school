@@ -211,3 +211,8 @@ Le formulaire de connexion est commun à tous les rôles. Pour l'administrateur,
 - Lorsque Supabase exige la confirmation d'e-mail et n'ouvre pas de session immédiatement, les fichiers sont provisoirement gardés dans IndexedDB du navigateur courant puis téléversés après la connexion. Utiliser le même navigateur et un appareil personnel. Ce stockage local temporaire n'est pas chiffré par l'application.
 - Sur une base où 01 à 09 ont déjà été appliquées, exécuter uniquement `supabase/migrations/10_PREUVES_AVANT_INSCRIPTION_ET_PARTENAIRE.sql` si elle n'est pas déjà appliquée. Ne pas rejouer les migrations précédentes.
 - Si la connexion admin échoue, exécuter en lecture seule `supabase/diagnostics/10_DIAGNOSTIC_CONNEXION_ADMIN.sql`. Vérifier `AUTH_USER_ABSENT`, e-mail non confirmé, profil manquant, rôle différent de `admin` ou adresse non présente/activée dans l'allowlist. Le diagnostic ne lit jamais le mot de passe et ne peut pas confirmer qu'il est correct.
+
+
+## Mise à jour v16 — champs justificatifs avant inscription professionnelle
+
+Après remplacement de `site/index.html`, `site/role-portal.js` et `site/service-worker.js` dans GitHub, vérifiez dans le formulaire « Devenir enseignant », « Devenir promoteur » et « Devenir partenaire » que les pièces apparaissent avant « Créer mon compte candidat ». Le formulaire doit refuser la création si une pièce obligatoire manque. Cette version n'ajoute aucune migration SQL. Une actualisation forcée du navigateur peut être nécessaire; le service worker v16 renouvelle le cache PWA.

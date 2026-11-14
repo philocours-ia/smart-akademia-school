@@ -98,7 +98,9 @@ async function processPendingSignupEvidence(profile) {
         // On conserve les chemins privés et les références, pas les fichiers locaux après transfert réussi.
         await savePendingSignupEvidence(profile.email, {
             kind: 'applicant', applicantType: draft.applicantType, paymentMethod: draft.paymentMethod || null,
-            transactionReference: draft.transactionReference || null, uploadedPaths, createdAt: draft.createdAt || new Date().toISOString()
+            transactionReference: draft.transactionReference || null, uploadedPaths,
+            specialty: draft.specialty || null, diplomaLevel: draft.diplomaLevel || null,
+            organizationName: draft.organizationName || null, createdAt: draft.createdAt || new Date().toISOString()
         });
         return true;
         } catch (error) {
@@ -109,20 +111,40 @@ async function processPendingSignupEvidence(profile) {
     return false;
 }
 
-function candidateEvidenceFields(type) {
-    if (type === 'teacher' || type === 'promoter') {
-        return `<p class="text-xs font-bold text-amber-950">Dossier obligatoire avant création du compte</p>
-            <div><label class="block text-xs font-bold mb-1" for="applicant-identity-file">Photo d’identité</label><input id="applicant-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"><p class="text-[10px] text-slate-500">JPG, PNG ou WEBP — 10 Mo maximum.</p></div>
-            <div><label class="block text-xs font-bold mb-1" for="applicant-diploma-file">Preuve du diplôme</label><input id="applicant-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"><p class="text-[10px] text-slate-500">Photo lisible ou PDF — 10 Mo maximum.</p></div>
-            ${type === 'promoter' ? '<p class="text-[11px] text-amber-900">Diplôme minimum exigé : Baccalauréat.</p>' : ''}`;
-    }
-    if (type === 'partner') {
-        return `<p class="text-xs font-bold text-amber-950">Justificatif de la première cotisation mensuelle : 100 000 Ar</p>
-            <div><label class="block text-xs font-bold mb-1" for="applicant-partner-payment-method">Mode de paiement</label><select id="applicant-partner-payment-method" required class="auth-input"><option value="">Choisir un mode de paiement</option><option value="MVola">MVola — 0385528349</option><option value="Binance Pay">Binance Pay — 820751129</option></select></div>
-            <div><label class="block text-xs font-bold mb-1" for="applicant-partner-transaction-reference">Référence / identifiant de transaction</label><input id="applicant-partner-transaction-reference" required minlength="3" maxlength="120" class="auth-input" placeholder="Identifiant figurant sur le reçu"></div>
-            <div><label class="block text-xs font-bold mb-1" for="applicant-partner-proof-file">Preuve de paiement</label><input id="applicant-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"><p class="text-[10px] text-slate-500">Image ou PDF — 10 Mo maximum. Référence obligatoire : FINANCEMENT.</p></div>`;
-    }
-    return '';
+function configureApplicantSignupFields(type) {
+    const setGroup = (id, visible) => {
+        const group = document.getElementById(id);
+        if (!group) return;
+        group.hidden = !visible;
+        group.querySelectorAll('input,select,textarea').forEach(field => {
+            field.disabled = !visible;
+            // Les champs requis du profil actif restent validés par le navigateur.
+            if (!visible) field.required = false;
+        });
+    };
+    setGroup('applicant-identity-diploma-fields', type === 'teacher' || type === 'promoter');
+    setGroup('applicant-teacher-details', type === 'teacher');
+    setGroup('applicant-promoter-details', type === 'promoter');
+    setGroup('applicant-partner-details', type === 'partner');
+
+    // Rétablit les attributs required pour le seul groupe actif.
+    const requiredByRole = {
+        teacher: ['applicant-identity-file','applicant-diploma-file','applicant-teacher-specialty'],
+        promoter: ['applicant-identity-file','applicant-diploma-file','applicant-promoter-diploma-level'],
+        partner: ['applicant-partner-organization','applicant-partner-payment-method','applicant-partner-transaction-reference','applicant-partner-proof-file']
+    };
+    (requiredByRole[type] || []).forEach(id => {
+        const field = document.getElementById(id);
+        if (field) { field.disabled = false; field.required = true; }
+    });
+    const nameLabel = document.getElementById('applicant-signup-name-label');
+    if (nameLabel) nameLabel.textContent = type === 'partner' ? 'Nom du représentant' : 'Nom et prénoms';
+    const intro = document.getElementById('applicant-evidence-intro');
+    if (intro) intro.textContent = type === 'teacher'
+        ? 'Enseignant : joignez votre photo d’identité, la preuve de votre diplôme et indiquez votre spécialité avant de créer le compte.'
+        : type === 'promoter'
+            ? 'Promoteur : joignez votre photo d’identité, la preuve du Baccalauréat minimum et indiquez le niveau du diplôme avant de créer le compte.'
+            : 'Partenaire : indiquez la personne ou l’organisme, puis joignez la preuve de la première cotisation de 100 000 Ar avec le mode et la référence FINANCEMENT.';
 }
 
 function openApplicantSignup(type) {
@@ -132,8 +154,7 @@ function openApplicantSignup(type) {
     const labels = { teacher: 'Candidature enseignant', partner: 'Candidature partenaire', promoter: 'Candidature promoteur' };
     document.getElementById('applicant-signup-type').value = type;
     document.getElementById('applicant-signup-title').textContent = labels[type];
-    const evidenceFields = document.getElementById('applicant-evidence-fields');
-    if (evidenceFields) evidenceFields.innerHTML = candidateEvidenceFields(type);
+    configureApplicantSignupFields(type);
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('applicant-signup-screen').classList.remove('hidden');
     document.getElementById('applicant-signup-screen').scrollIntoView({ behavior: 'instant', block: 'start' });
@@ -158,6 +179,8 @@ async function handleApplicantSignup(e) {
     if (password.length < 12) return showToast('Le mot de passe doit contenir au moins 12 caractères.', 'error');
     if (password !== confirm) return showToast('Les deux mots de passe ne correspondent pas.', 'error');
     const draft = { kind: 'applicant', applicantType: type, createdAt: new Date().toISOString() };
+    const submitButton = e.submitter || e.target.querySelector('button[type=submit]');
+    if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Vérification des pièces…'; }
     let accountCreated = false;
     try {
         if (type === 'teacher' || type === 'promoter') {
@@ -165,10 +188,19 @@ async function handleApplicantSignup(e) {
             draft.diplomaFile = document.getElementById('applicant-diploma-file')?.files[0];
             validatePrivateFile(draft.identityFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
             validatePrivateFile(draft.diplomaFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
+            if (type === 'teacher') {
+                draft.specialty = document.getElementById('applicant-teacher-specialty')?.value.trim();
+                if (!draft.specialty) throw new Error('Renseignez votre spécialité ou matière proposée.');
+            } else {
+                draft.diplomaLevel = document.getElementById('applicant-promoter-diploma-level')?.value;
+                if (!['Baccalauréat','Bac+2','Licence','Master','Doctorat'].includes(draft.diplomaLevel)) throw new Error('Le promoteur doit justifier au minimum du Baccalauréat.');
+            }
         } else {
+            draft.organizationName = document.getElementById('applicant-partner-organization')?.value.trim();
             draft.paymentMethod = document.getElementById('applicant-partner-payment-method')?.value;
             draft.transactionReference = document.getElementById('applicant-partner-transaction-reference')?.value.trim();
             draft.paymentProofFile = document.getElementById('applicant-partner-proof-file')?.files[0];
+            if (!draft.organizationName) throw new Error('Indiquez le nom du partenaire ou de l’organisme.');
             if (!['MVola','Binance Pay'].includes(draft.paymentMethod)) throw new Error('Choisissez MVola ou Binance Pay pour la cotisation partenaire.');
             if ((draft.transactionReference || '').length < 3) throw new Error('La référence de transaction est obligatoire.');
             validatePrivateFile(draft.paymentProofFile, 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','application/pdf']);
@@ -176,7 +208,7 @@ async function handleApplicantSignup(e) {
         await savePendingSignupEvidence(email, draft);
         const { data, error } = await supabaseClient.auth.signUp({
             email, password,
-            options: { data: { full_name: name, phone, account_kind: 'applicant', candidate_type: type } }
+            options: { data: { full_name: name, phone, account_kind: 'applicant', candidate_type: type, organization_name: draft.organizationName || null, specialty: draft.specialty || null, diploma_level: draft.diplomaLevel || null } }
         });
         if (error) throw error;
         accountCreated = !!data.user;
@@ -202,6 +234,8 @@ async function handleApplicantSignup(e) {
         } else {
             showToast(error.message || 'Impossible de créer le compte candidat.', 'error');
         }
+    } finally {
+        if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Créer mon compte candidat'; }
     }
 }
 
@@ -393,14 +427,14 @@ async function renderApplicantWorkspace(host, user) {
     const hasPartnerProof = !!paths.payment_proof;
     let typeFields = '';
     if (type === 'teacher') {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label><input id="candidate-specialty" required maxlength="120" class="auth-input" placeholder="Intitulé exact figurant dans votre PE de référence"><p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE retenus. Aucun catalogue officiel non vérifié n’est présélectionné.</p></div>
+        typeFields = `<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label><input id="candidate-specialty" required maxlength="120" class="auth-input" value="${escapeHtml(evidenceDraft?.specialty || '')}" placeholder="Intitulé exact figurant dans votre PE de référence"><p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE retenus. Aucun catalogue officiel non vérifié n’est présélectionné.</p></div>
         <div><label class="block text-xs font-bold mb-1">Diplôme le plus élevé</label><input id="candidate-diploma-level" required maxlength="120" class="auth-input" placeholder="Intitulé du diplôme"></div>
         ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues avant la création du compte et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Les justificatifs doivent être déposés avant l’envoi de la candidature. Votre compte est antérieur au nouveau formulaire : vous pouvez joindre les deux pièces ci-dessous.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
     } else if (type === 'promoter') {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label><select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option><option>Baccalauréat</option><option>Bac+2</option><option>Licence</option><option>Master</option><option>Doctorat</option></select><p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>
+        typeFields = `<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label><select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option><option ${evidenceDraft?.diplomaLevel === 'Baccalauréat' ? 'selected' : ''}>Baccalauréat</option><option ${evidenceDraft?.diplomaLevel === 'Bac+2' ? 'selected' : ''}>Bac+2</option><option ${evidenceDraft?.diplomaLevel === 'Licence' ? 'selected' : ''}>Licence</option><option ${evidenceDraft?.diplomaLevel === 'Master' ? 'selected' : ''}>Master</option><option ${evidenceDraft?.diplomaLevel === 'Doctorat' ? 'selected' : ''}>Doctorat</option></select><p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>
         ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues avant la création du compte et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Les justificatifs doivent être déposés avant l’envoi de la candidature. Votre compte est antérieur au nouveau formulaire : joignez les deux pièces ci-dessous.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
     } else {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label><input id="candidate-organization" required maxlength="180" class="auth-input" value="${escapeHtml(user.name || '')}"></div>
+        typeFields = `<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label><input id="candidate-organization" required maxlength="180" class="auth-input" value="${escapeHtml(evidenceDraft?.organizationName || user.name || '')}"></div>
         <label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5"> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme.</label>
         ${hasPartnerProof ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Preuve de la première cotisation, mode de paiement et référence reçus avant la création du compte.</div>' : '<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La preuve de la première cotisation mensuelle de 100 000 Ar et la référence FINANCEMENT sont obligatoires avant le dépôt de candidature.</div><div><label class="block text-xs font-bold mb-1">Mode de paiement</label><select id="candidate-partner-payment-method" required class="auth-input"><option value="">Choisir</option><option value="MVola">MVola</option><option value="Binance Pay">Binance Pay</option></select></div><div><label class="block text-xs font-bold mb-1">Référence de transaction</label><input id="candidate-partner-transaction-reference" required minlength="3" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve de paiement</label><input id="candidate-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>'}`;
     }

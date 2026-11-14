@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Test partenaire</title></head><body>
+<div id="role-portal-title"></div><div id="role-portal-subtitle"></div><div id="role-portal-content"></div>
+<script>
+let state = { currentUser: { id:'partner-test-001', role:'partner', name:'Partenaire Test', email:'partner@example.invalid', phone:'0340000000' }, isAdmin:false };
+function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const results = {
+  partner_memberships: {single:null, rows:[]},
+  partner_contributions: {rows:[]},
+  role_applications: {rows:[{id:'app-1', application_type:'partner', status:'approved', organization_name:'Association Test', applicant_name:'Partenaire Test', applicant_email:'partner@example.invalid', phone:'0340000000', monthly_commitment_accepted:true, documents:[{kind:'payment_proof',path:'partner-test-001/proof.pdf',payment_method:'MVola',payment_reference:'FINANCEMENT',transaction_reference:'TX-1001',amount_ar:100000}], review_note:null, created_at:'2026-11-14T10:00:00Z'}]},
+  role_messages: {rows:[]}
+};
+function mockQuery(table){
+ const q={ select(){return q}, eq(){return q}, order(){return q}, limit(){return q}, or(){return q}, maybeSingle(){return Promise.resolve({data:results[table]?.single ?? null,error:null})}, then(resolve,reject){return Promise.resolve({data:results[table]?.rows ?? [],error:null}).then(resolve,reject)} };
+ return q;
+}
+let supabaseClient={
+ from(table){return mockQuery(table)},
+ rpc(name){return Promise.resolve({data:[],error:null})},
+ storage:{from(bucket){return {createSignedUrl(path,seconds){return Promise.resolve({data:{signedUrl:'https://signed.invalid/proof'},error:null})},remove(paths){return Promise.resolve({error:null})}}}}
+};
+function showToast(){}
+</script>
+<script src="./site/role-portal.js"></script>
+<script>
+renderRolePortal().then(()=>{document.body.dataset.test='ok';document.getElementById('result').textContent=document.getElementById('role-portal-content').innerText;}).catch(e=>{document.body.dataset.test='failed';document.getElementById('result').textContent=String(e.stack||e)});
+</script><pre id="result">running</pre></body></html>

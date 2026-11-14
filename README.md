@@ -42,3 +42,13 @@ Les tests de connexion, RLS et Storage réels doivent être exécutés sur le pr
 ## Correctif du portail partenaire (v15)
 
 Consulter `docs/CORRECTIF_ESPACES_PARTENAIRES_ET_DIAGNOSTIC_PORTAILS_2026-11-14.md`. Il n'ajoute pas de migration SQL ; il rend le portail partenaire tolérant aux erreurs partielles et affiche les diagnostics des autres portails.
+
+
+## Correctif des pièces justificatives à l'inscription (v16)
+
+Les groupes de champs requis des candidatures enseignant, promoteur et partenaire sont maintenant directement présents dans `site/index.html`, puis affichés selon le profil choisi. Le service worker est en v16 et le script `role-portal.js` est versionné pour éviter de réutiliser l'ancien fichier en cache. Voir `docs/CORRECTIF_PIECES_INSCRIPTION_PROFILS_2026-11-14.md`.
+
+
+## Correctif des formulaires d'inscription professionnels (v16)
+
+Les pièces justificatives ne dépendent plus d'un bloc vide généré uniquement à l'exécution. Les champs des profils enseignant, promoteur et partenaire sont maintenant présents dans `site/index.html`; `role-portal.js` affiche le groupe adapté au profil choisi et désactive les champs des autres profils. La validation vérifie la présence des pièces avant l'appel à Supabase Auth. Le service worker passe en cache v16 et le script est chargé avec `?v=16-proof-fields`. Aucune migration SQL supplémentaire n'est requise. Voir `docs/CORRECTIF_PIECES_INSCRIPTION_PROFILS_2026-11-14.md`.

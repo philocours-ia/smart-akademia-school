@@ -1,6 +1,6 @@
-const CACHE_NAME = 'smart-akademia-school-shell-v15-partner-dashboard-diagnostics';
+const CACHE_NAME = 'smart-akademia-school-shell-v16-prereg-proof-fields';
 const APP_SHELL = [
-  './', './index.html', './administration.html', './role-portal.js', './manifest.webmanifest',
+  './', './index.html', './administration.html', './role-portal.js?v=16-proof-fields', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './assets/smart-akademia-emblem.webp', './assets/smart-akademia-logo-complet.webp'
 ];
 self.addEventListener('install', event => {
