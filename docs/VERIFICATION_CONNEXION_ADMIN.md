@@ -1,44 +1,26 @@
 # Vérification de la connexion administrateur — Smart Akademia School
 
-## État du contrôle
+## Ce que vérifie l'application
 
-Le contrôle du code local est terminé :
-- les scripts JavaScript intégrés passent la vérification de syntaxe Node.js ;
-- le manifeste PWA est un JSON valide ;
-- l'écran d'administration utilise Supabase Auth (`signInWithPassword`) ;
-- le profil doit posséder le rôle `admin` ;
-- le changement du mot de passe initial est obligatoire ;
-- juste avant l'ouverture du tableau de bord, l'application vérifie `rpc('is_admin')` ;
-- en cas d'échec du contrôle administrateur, la session est fermée et le tableau de bord reste masqué.
+1. L'identifiant affiché doit être `akademia`. Il est mappé vers l'adresse Auth autorisée configurée dans `site/index.html`.
+2. Le mot de passe est vérifié par Supabase Auth (`signInWithPassword`).
+3. Le profil Supabase doit avoir `role = 'admin'`.
+4. Si `must_change_password = true`, l'écran de changement s'affiche et le tableau de bord reste inaccessible.
+5. Après mise à jour du mot de passe Auth, le trigger `auth.users` doit mettre `must_change_password` à `false`.
+6. L'application appelle `rpc('is_admin')`; le serveur ne confirme le rôle admin que si le mot de passe initial a été changé.
+7. Les actions et lectures de données restent contrôlées par les politiques RLS.
 
-**Le test réel du serveur Supabase n'est pas encore effectué.** Le fichier `site/index.html` est maintenant renseigné avec le Project URL, la clé publishable fournie et l’adresse administrateur `julio7271@gmail.com`. Il reste à créer/vérifier le compte Auth et à effectuer les essais de connexion.
+## Provisionnement du compte
 
-## Mise en service du compte admin
+- Adresse autorisée : `julio7271@gmail.com`.
+- Identifiant de portail : `akademia`.
+- Le mot de passe initial est défini ou réinitialisé uniquement dans Supabase Authentication → Users. Ne jamais l'ajouter au HTML, au SQL, à GitHub, à une archive de déploiement ou à un message.
+- Le propriétaire doit confirmer l'adresse e-mail et vérifier `must_change_password = true` avant le premier essai.
+- La première connexion doit remplacer le mot de passe initial par un mot de passe robuste d'au moins 12 caractères.
 
-1. Exécuter `AKADEMIA_supabase_setup.sql` dans Supabase SQL Editor.
-2. Exécuter `02_MIGRATION_CONNEXION_ADMIN.sql` après le script principal. L’adresse `julio7271@gmail.com` est déjà intégrée à la migration.
-3. Après la migration, créer l'utilisateur correspondant dans Authentication → Users avec un mot de passe temporaire. La liste d'autorisation privée permet au trigger de créer directement un profil `admin`; aucune série élève factice ni métadonnée `role=admin` n'est utilisée.
-4. Si le compte Auth existait déjà, la migration promeut le profil correspondant à l'adresse autorisée et impose le changement de mot de passe.
-5. La configuration de `site/index.html` est déjà renseignée. La clé publishable est destinée au navigateur ; elle ne remplace pas les politiques RLS. **Ne jamais utiliser ou publier la clé `service_role`/secret.**
-6. Publier le site en HTTPS, puis ouvrir `/administration.html`.
+## Requête de contrôle en lecture seule
 
-## Scénario de test positif
-
-- Identifiant : `akademia`.
-- Mot de passe : celui défini pour l'utilisateur dans Supabase Auth.
-- Premier accès : l'écran de changement de mot de passe doit apparaître.
-- Après choix d'un mot de passe robuste d'au moins 12 caractères : l'application doit vérifier la mise à jour du hash dans Auth, confirmer `must_change_password = false`, vérifier `is_admin() = true`, puis ouvrir le tableau de bord.
-
-## Scénarios de test négatif
-
-- Un compte élève utilisé sur `/administration.html` ne doit pas ouvrir l'administration ; la session est fermée.
-- Un compte administrateur avec `must_change_password = true` ne doit pas accéder aux données d'administration avant d'avoir changé son mot de passe.
-- Si `is_admin()` ne renvoie pas `true`, le tableau de bord doit rester inaccessible.
-- Sur la page élève, un compte admin ne doit pas être présenté comme un élève.
-
-## Requête de diagnostic SQL
-
-Remplacer l'adresse ci-dessous et exécuter la requête dans SQL Editor :
+Exécuter dans Supabase SQL Editor :
 
 ```sql
 select
@@ -56,8 +38,23 @@ left join public.akademia_admin_allowlist a
 where lower(u.email) = lower('julio7271@gmail.com');
 ```
 
-Résultat attendu après provisionnement : `role = admin`, `series = Administrateur`, `must_change_password = true`, `adresse_admin_autorisee = true`. Après le changement initial du mot de passe, `must_change_password` doit être `false`.
+Avant le premier accès, résultat attendu : `role = admin`, `series = Administrateur`, `must_change_password = true`, `adresse_admin_autorisee = true`, et adresse confirmée. Après changement du mot de passe : `must_change_password = false`.
 
-## Informations nécessaires pour un test réel accompagné
+## Scénarios à effectuer sur le domaine HTTPS
 
-Le Project URL, la clé publishable et l’adresse e-mail administrateur sont maintenant renseignés dans le fichier web. L'administrateur saisira lui-même son mot de passe dans le portail ; il ne faut pas l'envoyer dans la conversation. Ne jamais communiquer la clé `service_role`/secret.
+### Positifs
+
+- Se connecter au portail `/administration.html` avec `akademia` et le mot de passe saisi dans Supabase Auth.
+- Vérifier l'écran de première connexion, puis changer le mot de passe.
+- Vérifier que le tableau de bord s'ouvre seulement après la confirmation serveur.
+
+### Négatifs
+
+- Un compte élève utilisé sur le portail admin doit être refusé et déconnecté.
+- Un compte admin avec `must_change_password = true` ne doit pas ouvrir le tableau de bord.
+- Si `rpc('is_admin')` ne renvoie pas `true`, le tableau de bord doit rester inaccessible.
+- Depuis l'espace élève, aucun lien ou bouton d'accès admin ne doit être visible.
+
+## État du test au 14 novembre 2026
+
+La syntaxe JavaScript, le manifeste et les chemins des ressources PWA ont été vérifiés statiquement. Le profil administrateur a été signalé comme `admin` dans le projet lors des étapes précédentes. En revanche, aucune connexion Auth réelle, aucun changement de mot de passe et aucun contrôle RLS distant n'ont été réalisés depuis l'environnement de préparation. Le propriétaire doit effectuer ces essais lui-même ; il ne doit jamais transmettre son mot de passe.

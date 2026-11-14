@@ -32,3 +32,10 @@ Les RAPE consultés sont étiquetés « édition septembre 2026 ». Ils réparti
 - Terminale : RAPE T12 L 5 h/semaine ; RAPE T12 S/OSE 3 h/semaine.
 
 Ces informations sont des transcriptions des documents repérés ; elles ne valent pas arbitrage ministériel. Toute discordance devra être confirmée par le MEN ou la direction pédagogique avant de configurer une progression horaire ferme.
+
+
+## Réserve de correspondance PE / FRP / suivi applicatif
+
+Le FRP Philosophie T12 est un document d'accompagnement du PE et présente ses propres rubriques thématiques (dont « Condition humaine »). Le suivi de progression de l'application regroupe certains contenus sous quatre axes internes, tandis que la banque de leçons conserve cinq ensembles de présentation. Cette correspondance est une organisation de travail AKADEMIA ; elle ne doit pas être présentée comme une reproduction officielle du découpage du FRP ou du PE sans validation de la version définitive du PE.
+
+Les RAPE T11 L, S et OSE sont des fichiers distincts. Le résumé des cinq périodes affiché dans l'application est commun aux trois séries ; une vérification de chaque PDF est requise avant de figer les affectations et les dates de publication. Les liens directs RAPE n'ont pas pu être relus en direct pendant le contrôle du 14 novembre 2026 (délais de réponse).

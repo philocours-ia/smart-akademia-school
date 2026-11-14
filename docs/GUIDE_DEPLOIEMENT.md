@@ -1,159 +1,192 @@
-# Smart Akademia School — Guide de configuration et de mise en ligne
+# Smart Akademia School — guide d'installation et de mise en ligne PWA
 
-## État réel du livrable
+**État au 14 novembre 2026 :** les fichiers de préparation sont cohérents et contrôlés statiquement. Le site n'est pas déployé, aucun domaine n'est attribué et l'authentification réelle n'a pas pu être testée depuis cet environnement. Ne pas annoncer l'application comme étant en ligne avant un déploiement HTTPS vérifié.
 
-Ce dossier contient une version PWA installable de l'interface, le portail d'entrée d'administration séparé, un manifeste, un service worker, des icônes, le script SQL Supabase et ce guide. **Le site n'est pas encore déployé.** Le fichier `site/index.html` est maintenant configuré avec le projet Supabase communiqué. La connexion réelle et la création du compte Auth administrateur restent à tester ; le domaine Netlify reste à définir.
+> **Nom officiel de la plateforme : Smart Akademia School.** Le nom est harmonisé dans l’application, le manifeste PWA, les ressources graphiques et la documentation de cette livraison.
 
-L'application ne crée plus de comptes, d'abonnements ni de progression dans le navigateur comme solution de remplacement. Tant que Supabase n'est pas configuré, les formulaires de connexion/inscription signalent que le service est indisponible. C'est intentionnel : éviter des comptes et paiements locaux non partagés et non fiables. La connexion administrateur ne peut pas être testée en direct avant de renseigner l'URL Supabase, la clé publique et l'adresse e-mail autorisée.
+## 1. Contenu livré
 
-## Contenu du paquet
+- `site/index.html` : application élève, connexion/inscription, suivi, cours, citations, bibliothèque, exercices, forum, assistance et « Qui sommes-nous ? ».
+- `site/administration.html` : porte d'entrée distincte vers le portail administrateur.
+- `site/manifest.webmanifest` : nom, portée, affichage autonome et icônes PWA.
+- `site/service-worker.js` : cache du shell same-origin, sans mise en cache des réponses Supabase.
+- `site/icons/` et `site/assets/` : icônes 192/512, icône Apple, favicon et logo.
+- `site/_headers` : en-têtes HTTP pour l'hébergement Netlify.
+- `supabase/01_AKADEMIA_supabase_setup.sql` : schéma, RLS, stockage privé, progression, abonnements et contenu protégé.
+- `supabase/migrations/02_MIGRATION_CONNEXION_ADMIN.sql` : allowlist admin privée et déclencheur d'attribution du rôle.
+- `supabase/migrations/03_HARDEN_PAYMENT_PROOFS.sql` : contrôle côté base de l'existence du justificatif et protection contre sa suppression par l'élève après enregistrement.
+- `supabase/diagnostics/04_PRE_LAUNCH_CHECKS.sql` : requêtes de contrôle en lecture seule.
+- `supabase/migrations/05_VALIDATION_INSCRIPTIONS.sql` : validation des profils élèves.
+- `supabase/migrations/06_ROLES_CANDIDATURES_FINANCE_MESSAGERIE.sql` : candidatures professionnelles, affectations, finance, messages et ressources enseignant.
+- `supabase/migrations/07_STUDENT_ENROLLMENT_DOCUMENTS.sql` : dossier élève et preuve du droit annuel.
+- `supabase/migrations/08_SUBSCRIPTION_PLANS_AND_VALIDATION.sql` : abonnements mensuel/annuel et décision admin protégée.
+- `supabase/migrations/09_SUPERVISION_ET_ENSEIGNANTS_COURS.sql` : Centre de supervision administrateur et affichage sécurisé des enseignants de Philosophie affectés.
 
-- `index.html` : application élèves ; les titres et résumés du PE sont visibles en aperçu, mais les corps complets des leçons sont chargés depuis Supabase uniquement avec un abonnement actif et une date de sortie atteinte. Le tableau de bord admin reste réservé au rôle serveur `admin`.
-- `administration.html` : porte d'entrée distincte vers la connexion administrateur. Elle n'est liée depuis aucun menu élève. La confidentialité ne dépend toutefois pas du secret de l'URL : Auth Supabase et RLS protègent les actions et les données.
-- `manifest.webmanifest`, `service-worker.js`, `icons/` : ressources PWA.
-- `AKADEMIA_supabase_setup.sql` : script de création/mise à jour des tables, politiques RLS, stockage privé et fonctions de tickets.
-- `MIGRATION_CONNEXION_ADMIN.sql` : autorisation privée et provisionnement sûr du compte administrateur ; à exécuter après le script principal.
+## 2. Portes d'entrée et contrôle d'accès
 
-## 1. Créer et configurer Supabase
+- **Élèves :** racine du site, `/` ou `/index.html`.
+- **Administration :** `/administration.html`, qui redirige vers le portail dédié de l'application.
+- Aucun lien ni bouton administrateur n'est affiché dans les menus élève.
+- L'URL d'administration n'est pas une protection. Le rôle `admin` est attribué côté base uniquement à l'adresse autorisée par la table privée `akademia_admin_allowlist` ; le rôle n'est jamais accepté depuis les métadonnées envoyées par le navigateur.
+- Après connexion, le profil Supabase doit avoir `role = 'admin'`. Le mot de passe initial doit être changé ; le trigger `auth.users` ne lève le verrou qu'après changement effectif du hash Auth. L'application appelle ensuite `rpc('is_admin')` avant d'afficher le tableau de bord.
+- Les politiques RLS protègent les profils, abonnements, messages, progressions, contenus de cours, calendrier et fichiers Storage. Le contrôle JavaScript ne remplace jamais ces politiques.
 
-1. Créer un projet Supabase et conserver son URL de projet et sa clé publique `anon`/publishable. **Ne jamais mettre une clé `service_role` ou `secret` dans le HTML, le manifeste ou le dépôt public.**
-2. Ouvrir le SQL Editor, sauvegarder les données existantes si le projet n'est pas neuf, puis exécuter `AKADEMIA_supabase_setup.sql`.
-3. Exécuter `MIGRATION_CONNEXION_ADMIN.sql` après le script principal. L’adresse `julio7271@gmail.com` est déjà renseignée dans la migration ; ne la remplace pas. Cette migration inscrit l'adresse dans une liste privée côté base et adapte le déclencheur d'inscription : seul cet e-mail reçoit le rôle `admin`. Les autres inscriptions restent obligées de fournir une série élève valide.
-4. **Après la migration**, aller dans Authentication → Users et créer l'utilisateur avec l'adresse autorisée et un mot de passe temporaire. Le déclencheur crée automatiquement son profil `admin` avec `must_change_password = true`. Pour un compte déjà présent dans Auth, la migration le promeut également s'il correspond à l'adresse autorisée.
-5. Dans Authentication → Providers, activer Email et choisir le comportement de confirmation d'adresse souhaité. Pour le compte admin, vérifier que l'adresse est confirmée avant le premier essai de connexion.
-6. Dans Authentication → URL Configuration, définir la Site URL et ajouter les URL de redirection du domaine publié, notamment `https://VOTRE_DOMAINE/` et `https://VOTRE_DOMAINE/index.html` (adapter exactement le domaine).
-7. La configuration `SUPABASE_CONFIG` a déjà été renseignée dans `index.html` avec les paramètres communiqués. Vérifier qu’elle reste cohérente avec l’adresse inscrite dans la migration :
+L'identifiant affiché est `akademia`. Il est mappé vers l'adresse Auth `julio7271@gmail.com` dans la configuration publique du site. Le mot de passe n'est pas stocké dans le HTML.
 
-```js
-const SUPABASE_CONFIG = {
-  url: 'https://dipcfwrxjyowpkrkncrs.supabase.co',
-  anonKey: '[clé publishable déjà renseignée dans le fichier]',
-  adminEmail: 'julio7271@gmail.com'
-};
-```
+## 3. Configuration Supabase
 
-La valeur `adminEmail` doit être identique à l’adresse ajoutée dans `MIGRATION_CONNEXION_ADMIN.sql` et au compte Auth créé. L'identifiant visible dans le portail reste `akademia` ; le mot de passe est vérifié par Supabase Auth. Le mot de passe temporaire doit être défini directement dans Supabase Auth et remplacé lors du premier accès par un mot de passe robuste d'au moins 12 caractères. Ne jamais inscrire le mot de passe dans le HTML, le dépôt GitHub, les scripts SQL ou les fichiers publiés.
+### Nouveau projet
 
-**Contrôle de sécurité à la connexion :** après authentification, l'application lit le profil dans `public.profiles`, impose le changement du mot de passe initial, puis appelle `rpc('is_admin')` côté serveur avant d'afficher le tableau de bord. Les autorisations réelles des données restent imposées par les politiques RLS ; le contrôle JavaScript n'est qu'une vérification supplémentaire.
+1. Créer un projet Supabase et conserver le Project URL et la clé publishable.
+2. Dans SQL Editor, exécuter `supabase/01_AKADEMIA_supabase_setup.sql` une seule fois.
+3. Exécuter `supabase/migrations/02_MIGRATION_CONNEXION_ADMIN.sql`.
+4. Dans Authentication → Users, créer ou mettre à jour l'utilisateur `julio7271@gmail.com`.
+5. Saisir le mot de passe initial demandé directement dans Supabase Auth, jamais dans le dépôt, le SQL, un fichier HTML ou la conversation. Vérifier que l'adresse est confirmée. Le profil doit afficher `role = admin`, `series = Administrateur` et `must_change_password = true` avant le premier accès.
+6. Exécuter `supabase/migrations/03_HARDEN_PAYMENT_PROOFS.sql`.
+7. Exécuter `supabase/diagnostics/04_PRE_LAUNCH_CHECKS.sql` et vérifier qu'aucune politique permissive héritée n'accorde un accès trop large à `storage.objects` ou aux tables applicatives.
 
-**Vérification dans Supabase SQL Editor :**
+### Projet déjà créé
 
-```sql
-select
-  u.email,
-  (u.email_confirmed_at is not null) as email_confirme,
-  u.last_sign_in_at,
-  p.role,
-  p.series,
-  p.must_change_password,
-  a.enabled as adresse_admin_autorisee
-from auth.users u
-left join public.profiles p on p.id = u.id
-left join public.akademia_admin_allowlist a
-  on a.email = lower(trim(u.email))
-where lower(u.email) = lower('julio7271@gmail.com');
-```
+Le propriétaire a indiqué avoir déjà exécuté les scripts initiaux et confirmé que le profil administrateur apparaît comme `admin`. Ne pas réexécuter le script 01 sur la base active sans sauvegarde. Vérifier l'historique SQL, exécuter la migration 03 une seule fois si elle n'a pas été appliquée, puis lancer le diagnostic 04.
 
-Avant le changement de mot de passe, le résultat attendu est `role = admin`, `series = Administrateur`, `must_change_password = true`, `adresse_admin_autorisee = true`. Après le changement, `must_change_password` doit devenir `false`. Le compte ne doit accéder au tableau de bord que dans ce dernier état.
+**Provisionnement du mot de passe :** cette préparation ne dispose pas d'une clé secrète Supabase ni d'un accès propriétaire au tableau de bord. Elle ne peut donc pas écrire/modifier le mot de passe Auth à distance. Le propriétaire doit saisir le mot de passe temporaire dans Supabase Authentication → Users. La première connexion doit le remplacer par un mot de passe robuste d'au moins 12 caractères. Ne jamais inscrire la valeur temporaire dans les fichiers livrés.
 
-## 2. Déployer le dossier sur un hébergement HTTPS
+### URL de site et redirections
 
-Publier uniquement les ressources nécessaires à l'interface sur un hébergement statique HTTPS (par exemple Cloudflare Pages, Netlify ou un hébergement Web classique). La racine web doit contenir `index.html`, `administration.html`, `manifest.webmanifest`, `service-worker.js` et `icons/`. Ne publiez pas le script SQL ni ce guide dans la racine publique ; conservez-les dans un emplacement privé.
+Après avoir obtenu le domaine Netlify ou le domaine personnalisé :
 
-Configurer ensuite Supabase Auth URL Configuration avec l'URL réelle du site, tester les liens de confirmation et de récupération de mot de passe, puis vérifier le portail administrateur.
+1. Supabase → Authentication → URL Configuration.
+2. Définir `Site URL` sur l'URL HTTPS réelle.
+3. Ajouter les URL exactes de redirection utilisées par les liens de confirmation et de récupération de mot de passe (racine et `index.html` du domaine publié).
+4. Tester confirmation d'e-mail, récupération et changement de mot de passe depuis le domaine réel.
 
-Portes d'entrée après publication :
+## 4. Déploiement Netlify
 
-- Élèves : `https://VOTRE_DOMAINE/`
-- Administration : `https://VOTRE_DOMAINE/administration.html` (ou `https://VOTRE_DOMAINE/index.html?espace=administration`)
+### Depuis GitHub
 
-L'interface élève ne contient aucun bouton ni lien d'administration. Mais l'URL dédiée n'est pas un mécanisme d'autorisation : le rôle doit rester vérifié par Supabase et chaque table/storage doit rester protégé par les politiques RLS.
+1. Décompresser le paquet source et pousser son contenu dans un dépôt privé.
+2. Dans Netlify, créer un nouveau site depuis Git.
+3. Définir le répertoire de publication sur `site`.
+4. Laisser la commande de build vide : il s'agit d'un site statique.
+5. Déployer, puis vérifier l'URL HTTPS générée.
 
-## 3. Installer sur téléphone
+### Déploiement manuel
 
-- Android : ouvrir le site publié dans Chrome, puis menu ⋮ → « Installer l'application » ou « Ajouter à l'écran d'accueil ».
-- iPhone : ouvrir le site dans Safari → Partager → « Sur l'écran d'accueil ».
+Utiliser le paquet Netlify fourni : son contenu doit être placé à la racine web. Ne publier ni `supabase/`, ni `docs/`, ni les scripts SQL.
 
-Le site doit être servi en HTTPS (ou localhost pour les essais). Le navigateur doit pouvoir récupérer le manifeste et le service worker. Le manifeste est configuré avec les icônes 192×192 et 512×512, la portée racine et l'affichage standalone.
+### Domaine et HTTPS
 
-## 4. Fonctionnalités intégrées et limites
+Netlify fournit un domaine HTTPS de test. Pour un domaine personnalisé, le rattacher dans Netlify, attendre l'émission du certificat TLS, puis mettre à jour Supabase Auth URL Configuration. Ne pas installer la PWA avant que le site soit servi en HTTPS (sauf `localhost` pour un test local).
 
-- Comptes et profils élèves : Supabase Auth + `profiles`, séries Seconde, Première L/S/OSE et Terminale L/S/OSE (les anciens profils « Première » restent reconnus à titre transitoire).
-- Administrateur : login d'interface `akademia`, email Auth renseigné dans la configuration, rôle `admin` confirmé côté base, changement de mot de passe initial imposé.
-- Progression : sauvegarde par élève dans `student_progress`; création/modification autorisée seulement pour les leçons déjà ouvertes par le calendrier et l’abonnement actif. Lecture de son propre suivi et lecture admin de la progression globale.
-- Abonnement : 30 jours par activation. Demande accompagnée d'une preuve obligatoire (image/PDF, 700 Ko max), d'un moyen MVola/Binance Pay et de la référence fixe `AKADEMIA`. Paiement non vérifié automatiquement : le professeur doit contrôler la preuve avant validation.
-- Ticket : un nouveau ticket unique est attribué par déclencheur SQL à chaque nouvelle activation validée. Il constitue un reçu d'activation, **pas un mot de passe** ; l'élève se connecte avec son e-mail et son mot de passe.
-- Rappels : notification dans l'application à la connexion/consultation lorsqu'il reste 7 jours ou moins. Aucun e-mail/SMS automatique programmé ; cela demanderait une Edge Function/cron et un fournisseur e-mail/SMS.
-- Citations et forum : les ajouts personnalisés et débats/commentaires sont stockés dans des tables Supabase et partagés entre les comptes. Les QCM, la bibliothèque et la banque de citations statiques restent incorporés au HTML. Les 21 corps de leçons T12 sont dans la table privée `course_lesson_content` et ne sont servis qu’après validation serveur de l’abonnement et de la date de sortie.
-- PWA : le service worker met en cache le shell same-origin. Les données Supabase, l'authentification et les fonctions de paiement nécessitent Internet. Les bibliothèques externes (Tailwind, Supabase JS, polices et icônes chargées par CDN) peuvent aussi nécessiter Internet ; cette version n'est pas une application pleinement hors ligne.
-- « Qui sommes-nous ? » : le texte institutionnel et l'emplacement de biographie/parcours sont présents et peuvent être complétés ultérieurement.
+## 5. Installation sur téléphone
 
-## 5. Référentiel PE et organisation des cours
+- Android : ouvrir le domaine HTTPS dans Chrome → menu ⋮ → Installer l'application ou Ajouter à l'écran d'accueil.
+- iPhone : ouvrir le domaine HTTPS dans Safari → Partager → Sur l'écran d'accueil.
 
-Le PE T12 consulté organise le programme autour de quatre thématiques :
+Le manifeste référence les icônes 192×192 et 512×512, et le service worker renouvelle le cache avec le nom `smart-akademia-school-shell-v12-supervision-course-greeting`. Après une mise à jour, fermer puis rouvrir l'application installée si l'ancien cache reste visible.
 
-1. Caractéristiques de la philosophie.
-2. Essence de l'homme.
-3. Formations de la connaissance.
-4. Pratiques sociales.
+**Limite hors ligne :** le shell statique et les icônes sont mis en cache ; Supabase, les comptes, les paiements, les cours et les CDN nécessitent Internet. Ne pas présenter cette PWA comme un mode hors ligne complet.
 
-L'application a réorganisé les leçons déjà présentes selon ces quatre ensembles, sans inventer de nouvelle leçon. Les modules explicitement signalés « Complément AKADEMIA » sont des développements pédagogiques conservés du fichier d'origine, pas des intitulés officiels revendiqués. Les RAPE T11 L/S/OSE de septembre 2026 permettent désormais d'afficher un aperçu du parcours Première par série et sa progression en cinq périodes. Le détail des cours T11, exercices et dates de publication n'est pas encore importé. Le RAPE T10 consulté ne répertorie pas la philosophie en Seconde ; l'application n'y invente donc pas de cours de philosophie.
+## 6. Modules et règles métier intégrés
 
-Le document PE consulté porte la mention « version expérimentale ». Les RAPE T12 de septembre 2026 indiquent Philosophie : L = 5 h/semaine, S = 3 h/semaine, OSE = 3 h/semaine. Pour T11, le PE détaillé indique L = 3 h, S = 2 h et OSE = 2 h/semaine, alors que les trois RAPE T11 indiquent 3 h/semaine. L'application présente les écarts au lieu de les résoudre arbitrairement.
+### Élèves : inscription annuelle et accès aux cours
 
-Références documentaires consultées :
-- Portail documentaire du Ministère de l'Éducation nationale : https://plateforme.education.mg/bibliotheque-numerique/
-- FRP Philosophie T12, L/S/OSE, édition octobre 2026 : https://plateforme.education.mg/bibliotheque-numerique/theme/biblio/pix/frp/FRP_philo_T12_L_S_OSE.pdf
-- Copie consultée du PE T12 (identifiée dans le document comme version expérimentale) : https://www.hrdaniel.mg/pe-pdf/T12.pdf
+- Les séries proposées sont Seconde, Première L/S/OSE et Terminale L/S/OSE. Le profil générique `Première` est conservé uniquement pour reprise/diagnostic et doit être affecté à une série par l’administration.
+- À la création Auth, le nouvel élève est `pending`. Il se connecte au portail restreint et transmet sa photo d’identité, son reçu MVola et l’identifiant de transaction pour le droit annuel de **2 000 Ar**, avec la référence `AKADEMIA_DROIT`, au **0385528349 — Nasandratriniaina Julio**.
+- Les fichiers du dossier annuel sont placés dans le bucket privé `student-enrollment-documents`. La validation par l’administrateur vérifie côté SQL que les deux fichiers existent réellement avant de changer le profil à `approved`. Le paiement demeure une vérification humaine à partir du reçu et de l’historique MVola.
+- La vérification faciale/KYC n'est pas activée. Aucun scan facial ni donnée biométrique n'est demandé ou traité par cette version ; un prestataire, une base légale, un consentement explicite et une politique de conservation seront nécessaires avant d'ajouter ce contrôle.
+- Les cours complets restent accessibles après abonnement validé : **15 000 Ar pour 30 jours** ou **145 000 Ar pour l’année scolaire**. Moyens acceptés : MVola `0385528349` ou Binance Pay `820751129`, référence obligatoire `AKADEMIA`, preuve et identifiant de transaction requis.
+- La validation d'un abonnement est une RPC admin : `admin_activate_student_subscription`. Elle vérifie la référence, le transaction ID et l'existence de la preuve Storage avant d'activer et d'émettre un nouveau ticket. Pour le mensuel, le renouvellement ajoute 30 jours à l'expiration active. Pour l'annuel, l'administrateur saisit la date réelle de fin de l'année scolaire ; aucune date n'est préremplie ou inventée.
+- Les demandes de renouvellement créent de nouvelles lignes. Le ticket est un justificatif/numéro d'accès associé à la souscription, pas un mot de passe ni un substitut à Supabase Auth. Le rappel de renouvellement est affiché dans l'application lorsque l'échéance approche ; aucun SMS ou e-mail automatique n'est programmé.
 
-## 6. Verrouillage des cours et répartition annuelle (nouvelle règle)
+### Candidatures professionnelles, enseignants, partenaires, promoteurs
 
-- Après inscription, l’élève peut ouvrir son espace et consulter l’état de son compte, mais les cours complets sont verrouillés tant qu’il n’a pas d’abonnement actif validé.
-- Le paiement ne débloque pas automatiquement toutes les leçons : une leçon est accessible seulement si `subscriptions.status = 'actif'`, `expires_at > now()` et si une ligne de `course_release_schedule` correspond à la série de l’élève et à une date `release_at <= now()`.
-- Les corps des 21 leçons existantes ont été retirés du HTML public et migrés dans `course_lesson_content`. La politique RLS Supabase ne renvoie à l’élève que les leçons ouvertes. Les titres et résumés restent visibles comme aperçu du programme.
-- `course_release_schedule` est volontairement créée sans dates de publication. Aucun cours complet n’est accessible avant la validation des contenus et des dates pour la série concernée. Les RAPE T10, T11 et T12 sont désormais repérées ; les semaines ne sont pas converties automatiquement en dates calendaires.
-- La colonne `release_at` est un horodatage avec fuseau horaire. Les périodes de RAPE (semaines 1–7, 8–14, 15–21, 22–27 et 28–33) doivent être rapprochées du calendrier scolaire officiel avant saisie des dates. Aucune date n’est inventée.
-- Après réception du document annuel, le script de mise à jour ajoutera une ligne par leçon et par série dans `course_release_schedule`. Les leçons futures resteront verrouillées ; elles seront déverrouillées automatiquement dès leur date et heure prévues, si l’abonnement de l’élève est toujours actif.
+- Les comptes candidats sont enregistrés sous le rôle limité `applicant`. Le rôle final n'est attribué qu'après décision admin côté SQL.
+- **Enseignant :** nom, e-mail, téléphone, spécialité proposée, diplôme, photo d'identité et preuve du diplôme. L'administrateur vérifie le dossier, confirme le nom de matière d'après les PE/RAPE retenus et affecte le professeur à une ou plusieurs séries. L'approbation et l'affectation sont regroupées dans une RPC transactionnelle.
+- **Partenaire :** le nom de la personne/organisation et l'acceptation de la contribution mensuelle de **100 000 Ar** sont requis. Après approbation de la candidature, le partenaire transmet une preuve et une référence de transaction avec `FINANCEMENT` par MVola ou Binance Pay. L'administrateur vérifie le justificatif et saisit la date réelle de fin d'année scolaire. Le système émet un ticket numérique à six chiffres ; il ne remplace jamais la connexion Supabase Auth. L'accès d'audit aux cours est conditionné par une cotisation active et un ticket annuel valide.
+- **Promoteur :** niveau Bac minimum avec photo et preuve de diplôme. Après approbation, un code de parrainage de huit caractères est attribué. Une commission de **1 000 Ar** est inscrite lorsque l'élève référé a lui-même obtenu l'approbation de son inscription. Le seuil de demande de paiement est **30 000 Ar**.
+- Les pièces des candidatures et les reçus partenaires sont stockés dans des buckets privés. Les URL signées utilisées par l'administration expirent après 15 minutes. Des politiques Storage restrictives supplémentaires empêchent des politiques permissives héritées d'ouvrir ces buckets par inadvertance.
 
-Exemple de structure (à ne pas exécuter avec ces dates fictives) :
+### Enseignants, paie, demandes administratives et messagerie
 
-```sql
-insert into public.course_release_schedule (series, lesson_id, release_at, release_note)
-values ('Terminale L', 't1c1', 'AAAA-MM-JJ 00:00:00+03', 'Période du programme');
-```
+- Espace enseignant : matières/séries affectées, progression enregistrée des élèves des séries autorisées, Top 3 selon le nombre de leçons terminées enregistrées, dépôt de ressources PDF/DOC/DOCX, finances et messagerie.
+- Le calcul de paie utilise **6 000 Ar par journée de travail validée par l'administration**. L'administrateur enregistre les jours travaillés. La demande de salaire porte sur le cumul acquis non encore réclamé ; les demandes d'avance et de paiement en attente ou déjà approuvées sont déduites pour éviter le double compte. Les avances ne sont accessibles qu'à partir de **30 000 Ar** disponibles.
+- L'administrateur doit effectuer le virement réel avant de marquer une demande financière comme payée et doit saisir sa référence de transfert. La plateforme ne déclenche aucun transfert MVola/Binance.
+- Les enseignants peuvent déposer une demande de congé, de remplacement ou de démission. Le formulaire exige les dates pour un congé/remplacement, le lieu pour un congé et le choix d'un remplaçant pour un remplacement. Un remplaçant proposé doit être un enseignant approuvé qui partage au moins une série affectée.
+- Les messages entre élèves sont limités aux élèves de la même série ; les échanges élève-enseignant sont restreints aux affectations pertinentes. Les partenaires et promoteurs ne peuvent écrire qu'à l'administration. Les contrôles sont appliqués côté SQL/RLS, pas uniquement dans l'interface.
 
-**Action pédagogique restante :** confirmer les différences de volumes PE/RAPE pour Première S et OSE, importer/rédiger et valider les leçons T11, puis fixer les dates de publication des leçons à partir du calendrier scolaire officiel.
+### Limites pédagogiques et institutionnelles
 
-## 7. Vérifications faites et vérifications restantes
+- Le tableau de bord enseignant compte uniquement les activités présentes dans `student_progress`. Il ne calcule pas à lui seul une progression officielle complète sur l'ensemble du PE.
+- Les matières et séries d'un enseignant sont confirmées manuellement à partir des sources pédagogiques réellement disponibles. Aucun catalogue officiel nouveau n'est présélectionné.
+- Le calendrier de publication des cours reste vide tant que les dates exactes n'ont pas été confirmées par la direction pédagogique.
+- La rubrique « Qui sommes-nous ? » est conservée et reste à compléter par le propriétaire.
 
-Vérifications possibles localement : cohérence des fichiers HTML/JS, présence des ressources PWA, validation de la syntaxe JavaScript et des références locales, vérification visuelle des parcours avec backend non configuré.
+## 7. Migrations Supabase : ordre et précautions
 
-Impossible avant de recevoir les paramètres du propriétaire : création réelle du compte admin, authentification Supabase, validation réelle des politiques RLS et storage, confirmations e-mail, tests des téléversements privés, tickets en base, tests des leçons verrouillées/déverrouillées sur un projet connecté et toute publication sur un domaine. Le calendrier de sortie des leçons reste vide en attendant la validation des contenus et la conversion pédagogique des semaines RAPE en dates du calendrier scolaire. Aucun paiement ne peut être vérifié automatiquement depuis MVola/Binance par le simple HTML.
+| N° | Fichier | Rôle | Type |
+|---|---|---|---|
+| 01 | `supabase/01_AKADEMIA_supabase_setup.sql` | Schéma de base, contenu protégé, abonnements et RLS initiales | Installation initiale |
+| 02 | `supabase/migrations/02_MIGRATION_CONNEXION_ADMIN.sql` | Allowlist et rôle admin Auth | Migration |
+| 03 | `supabase/migrations/03_HARDEN_PAYMENT_PROOFS.sql` | Durcissement des preuves de paiement | Migration |
+| 04 | `supabase/diagnostics/04_PRE_LAUNCH_CHECKS.sql` | Audit de politiques et configuration, lecture seule | Diagnostic, pas une migration |
+| 05 | `supabase/migrations/05_VALIDATION_INSCRIPTIONS.sql` | Statut et validation initiale des inscriptions élèves | Migration |
+| 06 | `supabase/migrations/06_ROLES_CANDIDATURES_FINANCE_MESSAGERIE.sql` | Candidatures, rôles, affectations, partenaires, promoteurs, finances, demandes, cours et messages | Migration |
+| 07 | `supabase/migrations/07_STUDENT_ENROLLMENT_DOCUMENTS.sql` | Droit annuel élève, pièces privées et vérification des pièces à la validation | Migration |
+| 08 | `supabase/migrations/08_SUBSCRIPTION_PLANS_AND_VALIDATION.sql` | Plans mensuel/annuel et validation serveur des abonnements | Migration |
+| 09 | `supabase/migrations/09_SUPERVISION_ET_ENSEIGNANTS_COURS.sql` | Centre de supervision admin et affichage des enseignants de Philosophie affectés par série | Migration |
 
-Avant ouverture au public, tester dans votre propre projet : création d'un compte élève, confirmation d'e-mail, connexion, progression, dépôt d'une preuve, validation de l'abonnement par le compte admin, émission du ticket, refus d'accès d'un élève aux profils/autres preuves/autres progressions, mot de passe oublié, première connexion admin et changement du mot de passe initial.
+### Base vierge
 
+1. Exécuter 01 une seule fois.
+2. Exécuter 02, créer/valider ensuite le compte Auth administrateur autorisé.
+3. Exécuter 03, puis 05, 06, 07, 08 et 09, dans cet ordre.
+4. Exécuter 04 en dernier pour le diagnostic en lecture seule.
 
-## 8. Changement de marque et ajout de la classe de Seconde
+### Base ayant déjà reçu les migrations 01 à 05
 
-- Le nom visible de la plateforme est désormais **Smart Akademia School**. Le code de référence de paiement reste exactement `AKADEMIA`, conformément à la consigne du propriétaire.
-- Le formulaire d'inscription exige un choix explicite parmi Seconde, Première L, Première S, Première OSE, Terminale L, Terminale S ou Terminale OSE ; aucune classe n'est présélectionnée.
-- La classe choisie est stockée dans le profil Supabase et ne peut pas être changée librement depuis le navigateur. Les demandes de paiement et les messages doivent correspondre à cette classe côté base.
-- La Seconde est ajoutée à la structure technique et à la navigation de présentation, mais son programme, ses contenus, ses horaires et son calendrier de publication ne sont pas inventés. Le portail affiche « parcours en préparation » tant que les sources pédagogiques ne sont pas intégrées.
-- **Limite documentaire :** la bibliothèque de fichiers de cette conversation n'est pas accessible à l'outil de traitement. Les documents que le propriétaire indique avoir déposés dans sa bibliothèque n'ont donc pas pu être lus. Pour reconstituer fidèlement les cours et leur répartition selon la Répartition Annuelle de Programme d'Enseignement, il faut joindre ces documents directement à la conversation (PDF, DOCX, XLSX ou images lisibles).
+Après avoir terminé le test courant et confirmé que 01 à 05 sont réellement appliquées, exécuter uniquement les migrations 06, 07, 08 et 09 encore absentes, dans cet ordre. Ne pas rejouer 01, 02, 03 ou 05 sur une base active. Si une de ces migrations a déjà été appliquée, ne pas la rejouer ; vérifier l'historique et l'état réel de la base.
 
+Les migrations doivent être testées sur une sauvegarde ou une base de recette avant production. Les fichiers 06 à 09 sont conçus pour les prérequis indiqués en tête de chaque fichier, mais leur exécution PostgreSQL distante n'a pas été faite depuis cet environnement.
 
-### Base Supabase déjà créée ?
+## 8. Tests effectués et limites
 
-Si votre projet Supabase a déjà reçu un ancien script, exécutez `MIGRATION_CLASSE_SECONDE.sql` dans SQL Editor au lieu de recréer les tables. Cette migration autorise la classe Seconde, enlève la valeur de classe par défaut et protège les profils contre la modification de leur classe par le navigateur. Sur un nouveau projet, utilisez le script de configuration complet.
+### Contrôles locaux effectués pour cette mise à niveau
 
+- `node --check` sur `site/role-portal.js` et sur chacun des scripts JavaScript intégrés à `index.html`.
+- Analyse HTML : 174 identifiants `id`, aucune duplication ; 12 références locales vérifiées, aucune ressource manquante.
+- Analyse JSON du manifeste PWA.
+- Contrôle de présence des fichiers et ressources PWA utilisés par le shell.
+- Relecture statique des migrations 06 à 09, y compris les prérequis, politiques RLS, fonctions `SECURITY DEFINER` et absence de clé `service_role`/mot de passe dans ces scripts.
 
-## 9. Mise à niveau PE/RAPE (novembre 2026)
+### Ce qui n'a pas été testé
 
-- Les parcours de Première sont désormais différenciés en **Première L, Première S et Première OSE** à l'inscription. Les anciens profils portant seulement « Première » restent conservés en base et doivent être vérifiés manuellement avant affectation à une série. Exécuter `MIGRATION_T11_PROGRAMMES_ET_SERIES.sql` dans Supabase avant d'ouvrir les nouvelles inscriptions si le backend existait déjà.
-- Le module Cours affiche une structure de programme T11 issue du PE (deux thèmes) et sa progression en cinq périodes issue des RAPE de septembre 2026. L'aperçu ne prétend pas être un cours complet : les contenus, exercices et dates calendaires restent à rédiger/importer/valider.
-- Les volumes horaires Première S/OSE divergent entre PE et RAPE ; l'interface expose explicitement les deux informations. Première L est concordante. Les RAPE T12 consultés indiquent 5 h/semaine en L et 3 h/semaine en S/OSE. Le RAPE T10 consulté ne répertorie pas la philosophie parmi les disciplines.
-- Le RAPE fournit une progression par semaines et cinq périodes, mais pas de dates calendaires. Ne remplissez `course_release_schedule.release_at` qu'après rapprochement avec le calendrier scolaire officiel et validation pédagogique.
-- Boky Citation retrouve les 40 entrées historiques et incorpore les entrées du FRP Philosophie T12 L/S/OSE. Les nouvelles citations affichent leur page imprimée, la référence RES et le lien vers le fascicule. Les libellés d'auteur sont conservés tels qu'imprimés et ne sont pas présentés comme vérifiés indépendamment.
-- `REFERENTIEL_SOURCES_MEN.md` récapitule les sources officielles, les décisions d'intégration et les divergences repérées.
+- Exécution des migrations sur une base PostgreSQL/Supabase réelle ; aucun client `psql` ni environnement PostgreSQL de test n'était connecté ici.
+- Auth réelle, confirmation d'adresse e-mail, upload Storage, politiques RLS, RPC, droits admin, validation de paiement et émission de tickets sur le projet distant.
+- Transfert réel MVola/Binance, paie d'enseignant/promoteur ou preuve de paiement. Les décisions financières de l'application ne constituent pas une preuve qu'un virement a été effectué.
+- Test Playwright tenté, mais la navigation HTTP locale a été bloquée par l’environnement (`net::ERR_BLOCKED_BY_ADMINISTRATOR`) ; aucun parcours navigateur réel, test multi-comptes et installation sur Android/iOS ne sont donc attestés.
+- Déploiement Netlify ou vérification du domaine HTTPS.
 
-**Important :** cette mise à niveau prépare les fichiers et le SQL ; elle ne modifie pas un projet Supabase distant et ne publie pas l'application. La migration SQL doit être exécutée sur le projet actif, puis les fichiers web mis à jour doivent être déployés sur l'hébergement HTTPS.
+## 9. Actions requises du propriétaire avant production
+
+1. Terminer le test Supabase actuel et relever exactement les migrations exécutées avec succès.
+2. Sauvegarder la base, puis appliquer seulement les migrations 06, 07, 08 et 09 encore absentes, dans l'ordre indiqué.
+3. Exécuter le diagnostic 04 et vérifier toute politique héritée ou permission Storage trop large.
+4. Tester avec des comptes distincts : élève (inscription et rejet/reprise), enseignant (candidature, affectation, ressources, suivi, paie), partenaire (candidature, cotisation, ticket), promoteur (code, élève référé, commissions) et administrateur.
+5. Fournir/valider les dates réelles d'année scolaire et les dates de publication des leçons ; contrôler les PE/RAPE/FRP par série avant affectation des disciplines et calendrier.
+6. Confirmer le domaine HTTPS et les redirections Supabase Auth, puis publier le contenu de `site/` sur Netlify.
+7. Tester l'installation PWA sur appareils réels et changer la clé/cache si une nouvelle version est déployée.
+8. Décider du prestataire KYC, du cadre de confidentialité et des conditions de conservation avant tout contrôle facial.
+9. Compléter « Qui sommes-nous ? » ; l’identité publique est désormais **Smart Akademia School**.
+
+**État de cette livraison :** code et scripts préparés, contrôles statiques locaux passés. Aucune migration n'est déclarée appliquée à votre projet, aucun paiement n'est vérifié et le site n'est pas déclaré en ligne.
+
+## 10. Scénarios de test détaillés
+
+La recette métier complète, avec tests positifs et négatifs par rôle, est décrite dans `docs/SCENARIOS_TEST_SUPABASE_06_09.md`. Utiliser exclusivement des comptes, justificatifs et paiements fictifs sur un projet de test.
+
+## 7. Centre de supervision et accueil du cours
+
+La migration `09_SUPERVISION_ET_ENSEIGNANTS_COURS.sql` doit être appliquée après 01–08. Elle expose les métriques agrégées du Centre de supervision via `get_akademia_admin_supervision()`, RPC réservée à `public.is_admin()`. Le montant mensuel affiche les paiements qui ont été marqués comme approuvés dans la base (droits élèves, abonnements et contributions partenaires) ; il ne prouve pas à lui seul un encaissement externe et aucun virement n’est effectué automatiquement.
+
+Lorsqu’un élève approuvé consulte le parcours Philosophie, le portail affiche une salutation personnalisée. Le nom du responsable est lu dans les affectations actives `teacher_subject_assignments` et ne s’affiche que si un enseignant approuvé est affecté à la série du profil. En l’absence d’affectation, l’interface l’indique au lieu d’inventer un nom. L’approbation d’une candidature enseignant et son affectation doivent être finalisées par l’administration.
