@@ -14,7 +14,10 @@
   const displayDate = value => value ? new Date(value).toLocaleDateString('fr-FR') : '—';
 
   window.renderPromoterWorkspace = async function renderPromoterWorkspace(host, user) {
-    if (!host || !user?.id || !window.supabaseClient) return;
+    // role-portal.js declares supabaseClient as a top-level lexical binding in
+    // some builds; such bindings are not necessarily exposed as window properties.
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : window.supabaseClient;
+    if (!host || !user?.id || !client) return;
 
     const load = async (label, query) => {
       try {
@@ -27,13 +30,13 @@
     };
 
     const [commissionResult, financeResult, referralResult] = await Promise.all([
-      load('Commissions', supabaseClient.from('promoter_commissions')
+      load('Commissions', client.from('promoter_commissions')
         .select('id,student_id,amount_ar,created_at').eq('promoter_id', user.id)
         .order('created_at', { ascending: false })),
-      load('Demandes financières', supabaseClient.from('finance_requests')
+      load('Demandes financières', client.from('finance_requests')
         .select('id,request_type,amount_ar,status,transfer_reference,created_at')
         .eq('user_id', user.id).order('created_at', { ascending: false })),
-      load('Élèves parrainés', supabaseClient.rpc('list_akademia_promoter_referrals')),
+      load('Élèves parrainés', client.rpc('list_akademia_promoter_referrals')),
     ]);
 
     const commissions = commissionResult.data;
