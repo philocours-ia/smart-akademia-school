@@ -12,10 +12,13 @@
 | 08 | `migrations/08_SUBSCRIPTION_PLANS_AND_VALIDATION.sql` | Plans d'abonnement et décision admin sécurisée | Après 01–07 |
 | 09 | `migrations/09_SUPERVISION_ET_ENSEIGNANTS_COURS.sql` | Centre de supervision admin et nom des enseignants de Philosophie affectés à la série de l'élève | Après 01–08 |
 | 10 | `migrations/10_PREUVES_AVANT_INSCRIPTION_ET_PARTENAIRE.sql` | Autorise le pré-dépôt du justificatif de cotisation partenaire et exige son rattachement à la candidature avant approbation | Après 01–09 |
+| 11 | `diagnostics/11_DIAGNOSTIC_PORTAILS_UTILISATEURS.sql` | Diagnostic en lecture seule des portails | Diagnostic uniquement, pas une migration |
+| 12 | `migrations/12_TROISIEME_ET_VALIDATION_CANDIDATURES.sql` | Classe Troisième/T9, limites des nouvelles inscriptions, RPC explicite de décision admin, liste des enseignants affectés | Après 01–10 |
+| 13 | `migrations/13_MVOLA_COORDONNEES_ET_PREPARATION_PAIE.sql` | Numéros MVola nominatifs, vérification administrative des titulaires et garde serveur avant clôture de paie | Après 01–10 et 12 |
 
 ## Ordre complet — projet neuf
 
-01 → 02 → provisionnement compte Auth admin → 03 → 05 → 06 → 07 → 08 → 09 → 10 → diagnostic 04.
+01 → 02 → provisionnement compte Auth admin → 03 → 05 → 06 → 07 → 08 → 09 → 10 → 12 → diagnostics 04 et 11.
 
 ## Base déjà en test avec 01 à 05
 
@@ -28,3 +31,11 @@ La migration 09 ajoute deux RPC : `get_akademia_admin_supervision()` (admin uniq
 
 
 La migration 10 n'est pas une migration de login ; elle permet de téléverser la preuve de première cotisation d'un partenaire pendant que son profil est encore candidat, puis inscrit une cotisation en attente lorsque la candidature est approuvée. La validation de paiement reste manuelle.
+
+
+La migration 12 conserve les anciennes valeurs de série dans le schéma afin de ne pas rendre les anciens dossiers illisibles, mais les nouvelles inscriptions élèves et les nouvelles affectations sont limitées à Troisième (T9) et Terminale L/S/OSE. Elle ajoute la fonction `admin_decide_role_application()` utilisée par les boutons de validation et `get_my_course_assignments()` pour afficher les enseignants affectés à la série d'un élève. L'approbation d'une candidature partenaire ne valide pas automatiquement son versement : la cotisation initiale reste à vérifier manuellement avant génération du ticket.
+
+
+La migration 13 ajoute les coordonnées MVola des candidats enseignants, partenaires et promoteurs, leurs champs de mise à jour dans les portails et les RPC de contrôle admin. Elle prépare la paie enseignants/promoteurs via la file de demandes et une exportation de rapprochement ; ce CSV n'est pas le modèle d'import officiel MVola. La fonction `admin_review_finance_request()` est renforcée côté serveur : une demande ne peut être marquée payée que si le compte MVola du bénéficiaire est vérifié et si une référence de transfert réelle est fournie.
+
+L'API Merchant Payment pour les encaissements clients n'est pas encore implémentée par la migration 13. Elle nécessite la documentation technique et les paramètres Sandbox liés au compte MVola Developer du propriétaire, puis la procédure GO LIVE MVola. Les secrets restent exclusivement côté backend Supabase Edge Functions.
