@@ -1,20 +1,26 @@
-const CACHE_NAME = 'smart-akademia-school-shell-v18-teacher-adhesion-terms';
+const CACHE_NAME = 'smart-akademia-school-shell-v19-portal-resilience';
 const APP_SHELL = [
-  './', './index.html', './administration.html', './role-portal.js?v=17-t9-teacher-admin-fix', './teacher-adhesion-terms.js', './manifest.webmanifest',
+  './', './index.html', './administration.html', './role-portal.js?v=17-t9-teacher-admin-fix', './teacher-adhesion-terms.js', './portal-resilience.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './assets/smart-akademia-emblem.webp', './assets/smart-akademia-logo-complet.webp'
 ];
 
-async function addTeacherConsentScript(response) {
+async function addClientEnhancements(response) {
   if (!response || !response.ok) return response;
   const contentType = response.headers.get('Content-Type') || '';
   if (!contentType.toLowerCase().includes('text/html')) return response;
 
   let html = await response.text();
-  const scriptTag = '<script src="./teacher-adhesion-terms.js" defer></script>';
-  if (!html.includes('teacher-adhesion-terms.js')) {
-    html = /<\/body\s*>/i.test(html)
-      ? html.replace(/<\/body\s*>/i, `${scriptTag}</body>`)
-      : `${html}${scriptTag}`;
+  const scripts = [
+    '<script src="./teacher-adhesion-terms.js" defer></script>',
+    '<script src="./portal-resilience.js" defer></script>',
+  ];
+  for (const script of scripts) {
+    const src = script.match(/src="([^"]+)"/)?.[1];
+    if (src && !html.includes(src)) {
+      html = /<\/body\s*>/i.test(html)
+        ? html.replace(/<\/body\s*>/i, `${script}</body>`)
+        : `${html}${script}`;
+    }
   }
   const headers = new Headers(response.headers);
   headers.delete('Content-Length');
@@ -26,9 +32,8 @@ self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     await cache.addAll(APP_SHELL);
-    // Cache the application shell with the consent script reference included.
     const index = await cache.match('./index.html');
-    if (index) await cache.put('./index.html', await addTeacherConsentScript(index));
+    if (index) await cache.put('./index.html', await addClientEnhancements(index));
     await self.skipWaiting();
   })());
 });
@@ -47,7 +52,7 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request)
-      .then(addTeacherConsentScript)
+      .then(addClientEnhancements)
       .then(response => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
