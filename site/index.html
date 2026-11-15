@@ -92,17 +92,17 @@
                 <div class="absolute -right-10 -bottom-12 text-[18rem] leading-none text-gold-500/10 pointer-events-none"><i class="fas fa-graduation-cap"></i></div>
                 <div class="relative z-10">
                     <img src="./assets/smart-akademia-emblem.webp" alt="Emblème Smart Akademia School : chapeau de diplômé, livres et stylos" class="w-full max-w-md mx-auto object-contain drop-shadow-2xl rounded-2xl" width="1310" height="627" fetchpriority="high">
-                    <p class="mt-2 text-center text-xs uppercase tracking-[.25em] text-gold-400 font-bold">Lycée numérique</p>
+                    <p class="mt-2 text-center text-xs uppercase tracking-[.25em] text-gold-400 font-bold">Collège et lycée numériques</p>
                     <h1 class="font-display text-3xl font-bold mt-2 leading-tight text-center">SMART AKADEMIA SCHOOL</h1>
                     <p class="text-gold-300 text-xs font-semibold tracking-[.18em] text-center mt-2">APPRENDRE • PROGRESSER • RÉUSSIR</p>
-                    <p class="text-slate-300 mt-5 leading-relaxed text-sm">Un lycée numérique pour accompagner les élèves de Madagascar dans leur parcours scolaire. Consultez les ressources de présentation et souscrivez pour accéder aux cours complets selon le calendrier annuel.</p>
+                    <p class="text-slate-300 mt-5 leading-relaxed text-sm">Une plateforme éducative numérique pour accompagner les collégiens et lycéens de Madagascar dans leur parcours scolaire. Consultez les ressources de présentation et souscrivez pour accéder aux cours complets selon le calendrier annuel.</p>
                 </div>
                 <div class="relative z-10 text-xs text-slate-400">Prof. RAKOTONIRINA Nasandratriniaina Julio</div>
             </div>
             <div class="p-6 sm:p-9 md:p-11">
                 <div class="lg:hidden flex items-center gap-3 mb-7">
                     <img src="./icons/icon-192.png" alt="Logo Smart Akademia School" class="w-14 h-14 rounded-2xl shadow-md object-cover" width="192" height="192">
-                    <div><p class="font-display font-bold text-navy-900">SMART AKADEMIA SCHOOL</p><p class="text-[11px] text-slate-500">Lycée numérique • Madagascar</p></div>
+                    <div><p class="font-display font-bold text-navy-900">SMART AKADEMIA SCHOOL</p><p class="text-[11px] text-slate-500">Collège et lycée numériques • Madagascar</p></div>
                 </div>
                 <div class="mb-6">
                     <p class="text-xs font-bold uppercase tracking-widest text-gold-600">Accès à la plateforme</p>
@@ -139,7 +139,7 @@
                         <div><label for="register-payment-proof" class="block text-xs font-bold text-slate-700 mb-1">Preuve MVola (obligatoire)</label><input id="register-payment-proof" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"><p class="text-[10px] text-slate-500">Image ou PDF — 10 Mo maximum.</p></div>
                     </div>
                     <p class="text-[11px] text-slate-500">Le paiement du droit annuel est distinct de l’abonnement aux cours. Les pièces sont temporairement conservées dans ce navigateur jusqu'à leur transfert sécurisé après connexion. La vérification faciale/KYC n’est pas activée.</p>
-                    <div><label for="register-series" class="block text-xs font-bold text-slate-700 mb-1">Votre classe / série</label><select id="register-series" required class="auth-input"><option value="" selected disabled>Choisissez votre classe / série</option><option value="Seconde">Seconde</option><option value="Première L">Première L</option><option value="Première S">Première S</option><option value="Première OSE">Première OSE</option><option value="Terminale L">Terminale L</option><option value="Terminale S">Terminale S</option><option value="Terminale OSE">Terminale OSE</option></select></div>
+                    <div><label for="register-series" class="block text-xs font-bold text-slate-700 mb-1">Votre classe / série</label><select id="register-series" required class="auth-input"><option value="" selected disabled>Choisissez votre classe / série</option><option value="Troisième">Troisième</option><option value="Terminale L">Terminale L</option><option value="Terminale S">Terminale S</option><option value="Terminale OSE">Terminale OSE</option></select></div>
                     <div><label for="register-referral" class="block text-xs font-bold text-slate-700 mb-1">Code de parrainage (facultatif)</label><input id="register-referral" type="text" autocomplete="off" maxlength="8" placeholder="Code à 8 caractères communiqué par un promoteur" class="auth-input"></div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label for="register-password" class="block text-xs font-bold text-slate-700 mb-1">Mot de passe</label><input id="register-password" type="password" required minlength="8" autocomplete="new-password" placeholder="8 caractères minimum" class="auth-input"></div>
@@ -339,7 +339,7 @@
                         <i class="fas fa-graduation-cap"></i> En appui aux Programmes d’études et RAPE du MEN
                     </div>
                     <h2 class="font-display text-2xl md:text-4xl font-bold leading-tight">
-                        L'excellence scolaire au service des lycéens de Madagascar
+                        L'excellence scolaire au service des collégiens et lycéens de Madagascar
                     </h2>
                     <p class="text-slate-300 text-sm md:text-base leading-relaxed">
                         Conçue et élaborée par <strong class="text-white">RAKOTONIRINA Nasandratriniaina Julio</strong> (Professeur certifié en Philosophie). Retrouvez des parcours progressifs adossés aux PE et RAPE officiels, une banque de citations malgaches/françaises lorsque les deux versions sont disponibles, des exercices et un accompagnement direct.
@@ -359,26 +359,11 @@
             </div>
 
             <!-- Sélecteur rapide par Série & Niveau -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-                <div onclick="selectSeriesAndGo('SECONDE')" class="cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-gold-500 transition group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 font-bold flex items-center justify-center group-hover:bg-navy-900 group-hover:text-gold-400 transition">2nde</span>
-                        <span class="text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full">Cycle lycée</span>
-                    </div>
-                    <h3 class="font-bold text-navy-900">Classe de Seconde</h3>
-                    <p class="text-xs text-slate-500 mt-1">Parcours en cours de constitution à partir des documents pédagogiques de référence.</p>
-                </div>
-                <div onclick="selectSeriesAndGo('PREMIERE_L')" class="cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-gold-500 transition group">
-                    <div class="flex items-center justify-between mb-2"><span class="w-10 h-10 rounded-xl bg-violet-50 text-violet-700 font-bold flex items-center justify-center group-hover:bg-navy-900 group-hover:text-gold-400 transition">1L</span><span class="text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-full">T11 L</span></div>
-                    <h3 class="font-bold text-navy-900">Première Littéraire</h3><p class="text-xs text-slate-500 mt-1">PE T11 et progression RAPE T11 L.</p>
-                </div>
-                <div onclick="selectSeriesAndGo('PREMIERE_S')" class="cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-gold-500 transition group">
-                    <div class="flex items-center justify-between mb-2"><span class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-700 font-bold flex items-center justify-center group-hover:bg-navy-900 group-hover:text-gold-400 transition">1S</span><span class="text-xs font-semibold text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-full">T11 S</span></div>
-                    <h3 class="font-bold text-navy-900">Première Scientifique</h3><p class="text-xs text-slate-500 mt-1">PE T11 et progression RAPE T11 S.</p>
-                </div>
-                <div onclick="selectSeriesAndGo('PREMIERE_OSE')" class="cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-gold-500 transition group">
-                    <div class="flex items-center justify-between mb-2"><span class="w-10 h-10 rounded-xl bg-orange-50 text-orange-700 font-bold flex items-center justify-center group-hover:bg-navy-900 group-hover:text-gold-400 transition">1O</span><span class="text-xs font-semibold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">T11 OSE</span></div>
-                    <h3 class="font-bold text-navy-900">Première OSE</h3><p class="text-xs text-slate-500 mt-1">PE T11 et progression RAPE T11 OSE.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div onclick="selectSeriesAndGo('TROISIEME')" class="cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-gold-500 transition group">
+                    <div class="flex items-center justify-between mb-2"><span class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 font-bold flex items-center justify-center group-hover:bg-navy-900 group-hover:text-gold-400 transition">3e</span><span class="text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full">Collège · T9</span></div>
+                    <h3 class="font-bold text-navy-900">Classe de Troisième</h3>
+                    <p class="text-xs text-slate-500 mt-1">Repères des matières du catalogue officiel MEN T9. Les leçons détaillées seront intégrées après validation des PE/RAPE.</p>
                 </div>
                 <div onclick="selectSeriesAndGo('L')" class="cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-gold-500 transition group">
                     <div class="flex items-center justify-between mb-2">
@@ -488,13 +473,13 @@
         <section id="view-cours" class="view-section hidden fade-in space-y-5">
             <div id="course-welcome-banner" class="hidden rounded-2xl border border-gold-300 bg-gradient-to-r from-amber-50 via-white to-blue-50 p-4 md:p-5 shadow-sm" aria-live="polite">
                 <p id="course-student-greeting" class="font-display text-lg md:text-xl font-bold text-navy-900">Bonjour !</p>
-                <p class="text-xs md:text-sm text-slate-600 mt-1">Bienvenue dans votre espace de Philosophie. Continuez votre apprentissage à votre rythme.</p>
-                <p class="text-xs md:text-sm mt-2 text-slate-700"><i class="fas fa-chalkboard-teacher text-gold-600 mr-1"></i> Enseignant responsable : <strong id="course-teacher-name" class="text-navy-900">Vérification de l’affectation…</strong></p>
+                <p class="text-xs md:text-sm text-slate-600 mt-1">Bienvenue dans votre espace pédagogique. Retrouvez les repères correspondant à votre classe et les ressources progressivement publiées.</p>
+                <p class="text-xs md:text-sm mt-2 text-slate-700"><i class="fas fa-chalkboard-teacher text-gold-600 mr-1"></i> Enseignant(s) responsable(s) : <strong id="course-teacher-name" class="text-navy-900">Vérification de l’affectation…</strong></p>
             </div>
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <span class="text-xs font-bold uppercase tracking-wider text-gold-600">Ministère de l'Éducation nationale • PE T10 / T11 / T12 • RAPE édition septembre 2026</span>
-                    <h2 class="font-display text-xl md:text-2xl font-bold text-navy-900">Parcours de Philosophie — Seconde, Première et Terminale</h2>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gold-600">Ministère de l'Éducation nationale • PE T9 / T12 • RAPE édition septembre 2026</span>
+                    <h2 class="font-display text-xl md:text-2xl font-bold text-navy-900">Parcours pédagogiques — Troisième (T9) et Terminale (T12)</h2>
                 </div>
                 <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-950">
                     <p class="font-bold"><i class="fas fa-user-graduate mr-1 text-gold-600"></i> Votre parcours : <span id="course-series-label">Série chargée après connexion</span></p>
@@ -635,15 +620,7 @@
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Classe / Série</label>
-                                <select id="msg-student-serie" disabled class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-navy-900 bg-slate-100">
-                                    <option value="Seconde">Seconde</option>
-                                    <option value="Première L">Première L</option>
-                                    <option value="Première S">Première S</option>
-                                    <option value="Première OSE">Première OSE</option>
-                                    <option value="Terminale L">Terminale L</option>
-                                    <option value="Terminale S">Terminale S</option>
-                                    <option value="Terminale OSE">Terminale OSE</option>
-                                </select>
+                                <select id="msg-student-serie" disabled class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-navy-900 bg-slate-100"><option value="Troisième">Troisième</option><option value="Terminale L">Terminale L</option><option value="Terminale S">Terminale S</option><option value="Terminale OSE">Terminale OSE</option></select>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Thématique</label>
@@ -834,10 +811,7 @@
                 <form id="admin-teacher-assignment-form" onsubmit="saveAdminTeacherAssignment(event)" class="space-y-3 rounded-xl bg-slate-50 p-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1" for="admin-assignment-teacher">Enseignant approuvé</label><select id="admin-assignment-teacher" name="teacher_id" required class="auth-input"><option value="">Chargement des enseignants…</option></select></div><div><label class="block text-xs font-bold mb-1" for="admin-assignment-subject">Matière</label><input id="admin-assignment-subject" name="subject_name" required maxlength="120" value="Philosophie" class="auth-input"></div></div>
                     <fieldset><legend class="text-xs font-bold mb-2">Séries concernées</legend><div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Seconde">Seconde</label>
-                        <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Première L">Première L</label>
-                        <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Première S">Première S</label>
-                        <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Première OSE">Première OSE</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Troisième">Troisième (T9)</label>
                         <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Terminale L">Terminale L</label>
                         <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Terminale S">Terminale S</label>
                         <label class="flex items-center gap-2"><input type="checkbox" name="target_series" value="Terminale OSE">Terminale OSE</label>
@@ -1003,7 +977,7 @@
                 <div class="border-t border-slate-100 pt-4 space-y-3">
                     <div><label class="block text-xs font-bold text-slate-700 mb-1">Nom & prénoms de l'élève</label><input type="text" id="sub-name" required placeholder="Votre nom complet" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"></div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div><label class="block text-xs font-bold text-slate-700 mb-1">Série</label><select id="sub-serie" disabled class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-slate-100"><option value="Seconde">Seconde</option><option value="Première L">Première L</option><option value="Première S">Première S</option><option value="Première OSE">Première OSE</option><option value="Terminale L">Terminale L</option><option value="Terminale S">Terminale S</option><option value="Terminale OSE">Terminale OSE</option></select></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1">Série</label><select id="sub-serie" disabled class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-slate-100"><option value="Troisième">Troisième</option><option value="Terminale L">Terminale L</option><option value="Terminale S">Terminale S</option><option value="Terminale OSE">Terminale OSE</option></select></div>
                         <div><label class="block text-xs font-bold text-slate-700 mb-1">Numéro de téléphone</label><input type="tel" id="sub-phone" required placeholder="Votre numéro" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"></div>
                     </div>
                 </div>
@@ -1409,7 +1383,7 @@
 
         function renderStudentTracking() {
             const total = totalLessonCount();
-            const isT12Tracking = !['SECONDE', 'PREMIERE_L', 'PREMIERE_S', 'PREMIERE_OSE', 'PREMIERE_LEGACY'].includes(state.selectedSeries);
+            const isT12Tracking = !['TROISIEME', 'SECONDE', 'PREMIERE_L', 'PREMIERE_S', 'PREMIERE_OSE', 'PREMIERE_LEGACY'].includes(state.selectedSeries);
             const knownLessonIds = isT12Tracking ? PE_T12_TRACKS.flatMap(track => track.lessonIds) : [];
             const done = knownLessonIds.filter(id => isChapterCompleted(id)).length;
             const percent = total ? Math.round(done / total * 100) : 0;
@@ -1800,7 +1774,7 @@
         }
 
         function getTotalPeLessons() {
-            if (['SECONDE', 'PREMIERE_L', 'PREMIERE_S', 'PREMIERE_OSE', 'PREMIERE_LEGACY'].includes(state.selectedSeries)) return 0;
+            if (['TROISIEME', 'SECONDE', 'PREMIERE_L', 'PREMIERE_S', 'PREMIERE_OSE', 'PREMIERE_LEGACY'].includes(state.selectedSeries)) return 0;
             return PE_T12_TRACKS.reduce((total, track) => total + track.lessonIds.length, 0);
         }
 
@@ -3318,6 +3292,7 @@
         }
 
         function seriesCode(seriesName) {
+            if (seriesName === 'Troisième') return 'TROISIEME';
             if (seriesName === 'Seconde') return 'SECONDE';
             if (seriesName === 'Terminale L') return 'L';
             if (seriesName === 'Terminale S') return 'S';
@@ -3339,7 +3314,9 @@
                 'Première S': 'PE T11 : 2 h/semaine ; RAPE T11 S : 3 h/semaine (divergence à faire confirmer).',
                 'Première OSE': 'PE T11 détaillé : 2 h/semaine ; RAPE T11 OSE : 3 h/semaine (divergence à faire confirmer).'
             };
-            const focusText = serie === 'Seconde'
+            const focusText = serie === 'Troisième'
+                ? 'Classe de Troisième = T9. Le catalogue officiel MEN répertorie Mathématique, Physique/Chimie, SVT, Histoire/Géographie, Malagasy, Français, Anglais et EPS. Les contenus de cours et la progression détaillée ne sont pas encore intégrés ; aucun contenu officiel n’est inventé.'
+                : serie === 'Seconde'
                 ? 'Le RAPE T10 consulté ne répertorie pas la philosophie parmi les disciplines du lycée en Seconde. Aucun cours officiel de philosophie T10 n’est donc affiché ici ; les autres matières seront structurées à partir de leurs PE/RAPE.'
                 : serie === 'Première'
                 ? 'Votre ancien profil indique seulement « Première ». La Première est répartie en séries L, S et OSE dans les documents MEN. Contactez l’administration pour faire vérifier et préciser votre série ; votre profil ne peut pas être modifié librement depuis cet écran.'
@@ -3350,7 +3327,7 @@
         }
 
         async function openAppForStudent(user) {
-            const allowedClasses = ['Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'];
+            const allowedClasses = ['Troisième', 'Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'];
             if (!supabaseClient || user?.role !== 'student') return showToast('Accès élève sécurisé indisponible.', 'error');
             if (user.registrationStatus !== 'approved') { await supabaseClient.auth.signOut(); document.getElementById('app-shell').classList.add('hidden'); document.getElementById('auth-screen').classList.remove('hidden'); return showToast('Votre inscription doit être validée par l’administration avant l’accès à l’espace élève.', 'info'); }
             if (!allowedClasses.includes(user.series)) return showToast('Votre classe n’est pas renseignée correctement. Contactez l’administration.', 'error');
@@ -3368,11 +3345,16 @@
             greeting.textContent = user.name;
             greeting.classList.remove('hidden');
             document.getElementById('msg-student-name').value = user.name || '';
-            document.getElementById('msg-student-serie').value = user.series || '';
-            document.getElementById('msg-student-serie').disabled = true;
+            ['msg-student-serie','sub-serie'].forEach(id => {
+                const select = document.getElementById(id);
+                if (select && user.series && ![...select.options].some(option => option.value === user.series)) {
+                    // Compatibilité d'affichage pour les anciens comptes : ces valeurs ne sont
+                    // plus proposées aux nouvelles inscriptions ni aux nouvelles affectations.
+                    select.add(new Option(`${user.series} (ancien profil)`, user.series));
+                }
+                if (select) { select.value = user.series || ''; select.disabled = true; }
+            });
             document.getElementById('sub-name').value = user.name || '';
-            document.getElementById('sub-serie').value = user.series || '';
-            document.getElementById('sub-serie').disabled = true;
             document.getElementById('sub-phone').value = user.phone || '';
             filterCourseSeries(state.selectedSeries);
             updateSeriesPresentation();
@@ -3390,7 +3372,7 @@
             const email = document.getElementById('register-email').value.trim().toLowerCase();
             const phone = document.getElementById('register-phone').value.trim();
             const series = document.getElementById('register-series').value;
-            const allowedSeries = ['Seconde', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'];
+            const allowedSeries = ['Troisième', 'Terminale L', 'Terminale S', 'Terminale OSE'];
             if (!allowedSeries.includes(series)) return showToast('Choisissez une classe ou série valide avant de créer votre compte.', 'error');
             const password = document.getElementById('register-password').value;
             const confirm = document.getElementById('register-password-confirm').value;
@@ -3481,7 +3463,7 @@
                     return showToast('Ce compte ne possède pas un rôle de connexion reconnu.', 'error');
                 }
                 if (profile.registrationStatus !== 'approved') return await openRolePortal(profile);
-                if (!['Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'].includes(profile.series)) {
+                if (!['Troisième', 'Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'].includes(profile.series)) {
                     await supabaseClient.auth.signOut();
                     return showToast('Votre compte ne possède pas une classe valide. Contactez l’administration.', 'error');
                 }
@@ -3692,8 +3674,15 @@
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h3 class="font-bold text-navy-900">Repères de progression RAPE T11 · 5 périodes</h3><p class="text-xs text-slate-500 mt-1 mb-3">Synthèse de travail des RAPE T11 repérés (édition septembre 2026). Les documents L, S et OSE sont distincts : vérifier les éventuelles différences propres à chaque série avant validation pédagogique et programmation. La répartition affichée comporte 33 semaines ; le RAPE ne fixe pas les dates calendaires, qui doivent être définies par l’équipe pédagogique en cohérence avec le calendrier scolaire et le PE.</p><div class="grid grid-cols-1 md:grid-cols-2 gap-2">${periodHtml}</div><div class="mt-3 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700"><strong>Fin d’année :</strong> rattrapage, révision et évaluation finale sont explicitement prévus dans la période 5 du RAPE.</div></div>`;
         }
 
-        function formatCourseTeacherNames(rows) {
-            const names = [...new Set((rows || []).map(row => String(row.teacher_name || '').trim()).filter(Boolean))];
+        function formatCourseTeacherNames(rows, seriesName) {
+            const relevant = seriesName === 'Troisième'
+                ? (rows || [])
+                : (rows || []).filter(row => String(row.subject_name || '').trim().toLowerCase() === 'philosophie');
+            if (seriesName === 'Troisième') {
+                const assignments = [...new Set(relevant.map(row => `${String(row.subject_name || '').trim()} : ${String(row.teacher_name || '').trim()}`).filter(value => !value.endsWith(' : ')))];
+                return assignments.length ? assignments.join(' · ') : 'Aucun enseignant n’est encore affecté aux matières de votre série.';
+            }
+            const names = [...new Set(relevant.map(row => String(row.teacher_name || '').trim()).filter(Boolean))];
             return names.length ? names.join(' · ') : 'Aucun enseignant n’est encore officiellement affecté à la Philosophie pour votre série.';
         }
 
@@ -3707,7 +3696,7 @@
                 if (courseTeacherCache.error) throw courseTeacherCache.error;
             }
             courseTeacherCache = { userId: user.id, series: user.series, data: null, promise: null, error: null };
-            courseTeacherCache.promise = supabaseClient.rpc('get_my_course_teachers', { p_subject_name: 'Philosophie' })
+            courseTeacherCache.promise = supabaseClient.rpc('get_my_course_assignments')
                 .then(({ data, error }) => {
                     if (error) throw error;
                     const rows = Array.isArray(data) ? data : [];
@@ -3732,16 +3721,16 @@
             const greeting = document.getElementById('course-student-greeting');
             const teacher = document.getElementById('course-teacher-name');
             if (greeting) greeting.textContent = `Bonjour ${user.name || 'élève'} !`;
-            if (teacher) teacher.textContent = 'Vérification de l’affectation…';
+            if (teacher) teacher.textContent = 'Vérification des affectations…';
             loadCourseTeacherAssignments().then(rows => {
                 if (state.currentUser?.id !== user.id || state.currentUser?.series !== user.series) return;
-                const label = formatCourseTeacherNames(rows);
+                const label = formatCourseTeacherNames(rows, user.series);
                 if (teacher) teacher.textContent = label;
                 const chapterTeacher = document.getElementById('chapter-course-teacher');
                 if (chapterTeacher) chapterTeacher.textContent = label;
             }).catch(error => {
                 console.warn('Affectation enseignant non disponible :', error);
-                const label = 'Affectation non disponible. Vérifiez que la migration Supabase 09 a été appliquée et qu’un enseignant est affecté à cette série.';
+                const label = 'Affectations non disponibles. Vérifiez que la migration Supabase 12 est appliquée et que les enseignants ont été affectés à votre classe.';
                 if (teacher) teacher.textContent = label;
                 const chapterTeacher = document.getElementById('chapter-course-teacher');
                 if (chapterTeacher) chapterTeacher.textContent = label;
@@ -3769,6 +3758,12 @@
             const isAdmin = !!state.isAdmin;
             const subscribed = isAdmin || !!state.isSubscribed;
             const seriesName = state.currentUser?.series || 'votre série';
+            if (state.selectedSeries === 'TROISIEME') {
+                const subjects = ['Mathématique','Physique / Chimie','Science de la vie et de la terre','Histoire / Géographie','Malagasy','Français','Anglais','EPS'];
+                const subjectCards = subjects.map(subject => `<div class="rounded-xl border border-slate-200 bg-white p-4"><p class="font-semibold text-sm text-navy-900">${escapeHtml(subject)}</p><p class="text-[11px] text-slate-500 mt-1">Matière figurant au catalogue officiel MEN de la classe de 3ème.</p><span class="inline-flex mt-2 rounded-full bg-amber-50 text-amber-800 px-2 py-1 text-[10px] font-bold">Contenu détaillé à intégrer</span></div>`).join('');
+                container.innerHTML = `<section class="rounded-2xl border border-sky-200 bg-sky-50 p-5 md:p-6 space-y-3"><p class="text-xs font-bold uppercase tracking-wider text-sky-800">Classe de Troisième · T9</p><h3 class="font-display text-xl font-bold text-navy-950">Repères du programme officiel</h3><p class="text-sm text-slate-700">Le catalogue numérique du Ministère de l’Éducation nationale répertorie les matières suivantes en classe de 3ème. La présente liste est un repère documentaire : les leçons complètes, les exercices, les évaluations et le calendrier de progression T9 ne sont pas encore intégrés dans Smart Akademia School. Aucun contenu pédagogique officiel n’est reconstitué ou inventé à partir du seul catalogue.</p><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">${subjectCards}</div><div class="rounded-xl bg-white border border-sky-100 p-3 text-xs text-slate-700"><strong>Sources du MEN :</strong> PE T9 et RAPE T9 figurent dans le catalogue de la bibliothèque numérique. Le fichier détaillé RAPE T9 doit être consulté et transcrit avant de créer le calendrier des leçons.</div><div class="flex flex-wrap gap-3 text-sm"><a class="underline font-semibold text-sky-800" target="_blank" rel="noopener noreferrer" href="https://plateforme.education.mg/bibliotheque-numerique/">Ouvrir la bibliothèque numérique officielle</a><a class="underline font-semibold text-sky-800" target="_blank" rel="noopener noreferrer" href="https://plateforme.education.mg/bibliotheque-numerique/theme/biblio/pix/rape/RAPE_T9.png">Consulter la couverture RAPE T9 (édition septembre 2026)</a></div><p class="text-[11px] text-slate-500">L’accès aux futurs cours complets restera soumis aux règles d’abonnement, de publication et de validation pédagogique.</p></section>`;
+                return;
+            }
             const scheduleRows = state.courseSchedule.filter(row => isAdmin || row.series === seriesName);
             const releasedCount = scheduleRows.filter(row => new Date(row.release_at).getTime() <= Date.now()).length;
             const availableCount = scheduleRows.filter(row => new Date(row.release_at).getTime() <= Date.now() && (isAdmin || !!state.courseContent[row.lesson_id])).length;
@@ -4472,10 +4467,11 @@
                     } else {
                         const rows = scheduleResult.data || [];
                         if (!rows.length) {
-                            scheduleStatus.textContent = 'Aucune date de cours n’est encore configurée : les cours complets restent verrouillés même après abonnement. Renseignez les dates après rapprochement des RAPE T10/T11/T12 avec le calendrier scolaire.';
+                            scheduleStatus.textContent = 'Aucune date de cours n’est encore configurée : les cours complets restent verrouillés même après abonnement. Renseignez les dates après rapprochement des RAPE T9/T12 avec le calendrier scolaire.';
                         } else {
-                            const summaries = ['Seconde', 'Première', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'].map(series => {
-                                const ownRows = rows.filter(row => row.series === series);
+                            const summaries = ['Troisième', 'Terminale L', 'Terminale S', 'Terminale OSE', 'Seconde (ancien profil)', 'Première (ancien profil)', 'Première L (ancien profil)', 'Première S (ancien profil)', 'Première OSE (ancien profil)'].map(series => {
+                                const querySeries = series.replace(' (ancien profil)', '');
+                                const ownRows = rows.filter(row => row.series === querySeries);
                                 const alreadyOpen = ownRows.filter(row => new Date(row.release_at).getTime() <= Date.now()).length;
                                 return `${series} : ${alreadyOpen}/${ownRows.length} leçon(s) ouverte(s)`;
                             });
@@ -4719,7 +4715,7 @@
             showAuthPanel('login');
         };
     </script>
-<script src="./role-portal.js?v=16-proof-fields"></script>
+<script src="./role-portal.js?v=17-t9-teacher-admin-fix"></script>
 <script>
         if ('serviceWorker' in navigator && window.isSecureContext) {
             window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(err => console.warn('Service worker non installé :', err)));

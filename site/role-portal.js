@@ -1,6 +1,6 @@
 /* Smart Akademia — portails candidats et professionnels. Les autorisations réelles sont en migration 06 / RLS. */
 let pendingCandidateType = '';
-const AKADEMIA_SERIES = ['Seconde', 'Première L', 'Première S', 'Première OSE', 'Terminale L', 'Terminale S', 'Terminale OSE'];
+const AKADEMIA_SERIES = ['Troisième', 'Terminale L', 'Terminale S', 'Terminale OSE'];
 
 
 // Les fichiers sont sélectionnés avant l'inscription puis conservés temporairement
@@ -541,27 +541,35 @@ async function submitRoleApplication(e) {
 }
 
 async function renderTeacherWorkspace(host, user) {
+    const settle = async request => {
+        try { return await request; }
+        catch (error) { return { data: null, error }; }
+    };
     const [a, w, f, s, r, progressResult, replacementsResult, agendaResult] = await Promise.all([
-        supabaseClient.from('teacher_subject_assignments').select('*').eq('teacher_id', user.id).eq('active', true),
-        supabaseClient.from('teacher_work_days').select('work_date,note').eq('teacher_id', user.id).order('work_date', { ascending: false }),
-        supabaseClient.from('finance_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabaseClient.from('staff_requests').select('*').eq('teacher_id', user.id).order('created_at', { ascending: false }),
-        supabaseClient.from('teacher_resources').select('*').eq('teacher_id', user.id).order('created_at', { ascending: false }),
-        supabaseClient.rpc('list_teacher_student_progress'),
-        supabaseClient.rpc('list_akademia_replacement_teachers'),
-        supabaseClient.from('course_release_schedule').select('series,lesson_id,release_at,release_note').order('release_at', { ascending: true }).limit(100)
+        settle(supabaseClient.from('teacher_subject_assignments').select('*').eq('teacher_id', user.id).eq('active', true)),
+        settle(supabaseClient.from('teacher_work_days').select('work_date,note').eq('teacher_id', user.id).order('work_date', { ascending: false })),
+        settle(supabaseClient.from('finance_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false })),
+        settle(supabaseClient.from('staff_requests').select('*').eq('teacher_id', user.id).order('created_at', { ascending: false })),
+        settle(supabaseClient.from('teacher_resources').select('*').eq('teacher_id', user.id).order('created_at', { ascending: false })),
+        settle(supabaseClient.rpc('list_teacher_student_progress')),
+        settle(supabaseClient.rpc('list_akademia_replacement_teachers')),
+        settle(supabaseClient.from('course_release_schedule').select('series,lesson_id,release_at,release_note').order('release_at', { ascending: true }).limit(100))
     ]);
-    const firstError = [a,w,f,s,r,progressResult,replacementsResult,agendaResult].find(x => x.error)?.error;
-    if (firstError) { host.innerHTML = roleMigrationNotice(firstError); return; }
-    const assignments = a.data || [], workDays = w.data || [], finances = f.data || [], staff = s.data || [], resources = r.data || [], students = progressResult.data || [], replacements = replacementsResult.data || [];
+    const panelIssues = [
+        ['Affectations', a], ['Journées validées', w], ['Finance', f], ['Demandes administratives', s],
+        ['Ressources de cours', r], ['Suivi des élèves', progressResult], ['Remplacements', replacementsResult], ['Agenda', agendaResult]
+    ].filter(([,result]) => result?.error);
+    const safeData = result => Array.isArray(result?.data) ? result.data : [];
+    const issueMarkup = panelIssues.length ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2"><p class="font-bold text-sm text-amber-950">Certaines rubriques n’ont pas pu être chargées ; votre profil reste accessible.</p>${panelIssues.map(([label,result])=>`<p class="text-xs text-amber-900"><strong>${escapeHtml(label)} :</strong> ${escapeHtml(result.error.message || 'Erreur Supabase')}${result.error.code ? ` (${escapeHtml(result.error.code)})` : ''}</p>`).join('')}<p class="text-[10px] text-amber-800">Les autres rubriques continuent de s’afficher. Vérifiez les migrations et les règles RLS des seules rubriques signalées.</p></div>` : '';
+    const assignments = safeData(a), workDays = safeData(w), finances = safeData(f), staff = safeData(s), resources = safeData(r), students = safeData(progressResult), replacements = safeData(replacementsResult);
     const assignedSeries = [...new Set(assignments.flatMap(x => x.target_series || []))];
-    const agenda = (agendaResult.data || []).filter(x => assignedSeries.includes(x.series));
+    const agenda = safeData(agendaResult).filter(x => assignedSeries.includes(x.series));
     const accrued = workDays.length * 6000;
     const reserved = finances.filter(x => ['pending','approved'].includes(x.status)).reduce((sum,x)=>sum+Number(x.amount_ar||0),0);
     const balance = Math.max(0,accrued-reserved);
     const assignmentOptions = assignments.map(x=>`<option value="${escapeHtml(x.subject_name)}">${escapeHtml(x.subject_name)}</option>`).join('');
     const seriesOptions = AKADEMIA_SERIES.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
-    host.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    host.innerHTML = `<section class="rounded-2xl border border-indigo-200 bg-indigo-50 p-5"><p class="text-[10px] uppercase tracking-widest font-bold text-indigo-700">Espace enseignant</p><h2 class="font-display text-xl font-bold text-navy-950 mt-1">Bonjour ${escapeHtml(user.name || 'Enseignant')} !</h2><p class="text-xs text-slate-700 mt-1">${escapeHtml(user.email || '')}${user.phone ? ` • ${escapeHtml(user.phone)}` : ''}</p><p class="text-xs text-indigo-900 mt-2">Votre profil enseignant est actif. Les rubriques de travail, de suivi et de finance apparaissent séparément selon les données accessibles.</p></section>${issueMarkup}<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
       <div class="bg-white rounded-2xl p-5 border"><p class="text-xs text-slate-500">Journées validées</p><p class="text-2xl font-bold text-navy-900">${workDays.length}</p></div>
       <div class="bg-white rounded-2xl p-5 border"><p class="text-xs text-slate-500">Salaire brut cumulé</p><p class="text-2xl font-bold text-navy-900">${accrued.toLocaleString('fr-FR')} Ar</p><p class="text-[11px] text-slate-500">6 000 Ar par journée validée par l’administration.</p></div>
       <div class="bg-white rounded-2xl p-5 border"><p class="text-xs text-slate-500">Disponible estimé</p><p class="text-2xl font-bold ${balance>=30000?'text-emerald-700':'text-amber-700'}">${balance.toLocaleString('fr-FR')} Ar</p></div>
@@ -1029,7 +1037,7 @@ async function renderAdminApplications(apps) {
         if (teacherOrPromoter && !hasDoc('diploma_proof')) missing.push('preuve du diplôme');
         if (a.application_type === 'partner' && !hasDoc('payment_proof')) missing.push('preuve de la première cotisation');
         const approvalAllowed = missing.length === 0 && allEvidenceAvailable;
-        cards.push(`<article class="rounded-xl border border-indigo-200 bg-white p-4 md:p-5 space-y-3 shadow-sm"><div class="flex flex-col lg:flex-row lg:justify-between gap-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h5 class="font-bold text-base text-navy-950">${escapeHtml(a.applicant_name || 'Nom non renseigné')}</h5><span class="rounded-full bg-amber-100 text-amber-900 px-2.5 py-1 text-[10px] font-bold">En attente</span><span class="rounded-full bg-indigo-100 text-indigo-900 px-2.5 py-1 text-[10px] font-bold">${typeLabel(a.application_type)}</span></div><div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 mt-2 text-xs text-slate-700"><p><span class="text-slate-500">E-mail :</span> ${escapeHtml(a.applicant_email || 'Non renseigné')}</p><p><span class="text-slate-500">Téléphone :</span> ${escapeHtml(a.phone || 'Non renseigné')}</p><p><span class="text-slate-500">Organisation :</span> ${escapeHtml(a.organization_name || 'Sans objet / non renseignée')}</p><p><span class="text-slate-500">Spécialité :</span> ${escapeHtml(a.specialty || 'Non renseignée')}</p><p><span class="text-slate-500">Diplôme :</span> ${escapeHtml(a.diploma_level || 'Non renseigné')}</p><p><span class="text-slate-500">Candidature déposée :</span> ${a.created_at ? new Date(a.created_at).toLocaleString('fr-FR') : 'Date inconnue'}</p><p class="sm:col-span-2 xl:col-span-3"><span class="text-slate-500">Référence du dossier :</span> <span class="font-mono">${escapeHtml(a.id)}</span></p></div>${paymentDetails}</div></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><p class="text-xs font-bold text-slate-800 mb-2">Pièces justificatives — ouvrir chaque document avant la décision</p><div class="flex flex-wrap gap-2">${links.join('') || '<span class="text-xs text-rose-700">Aucun justificatif consultable.</span>'}</div>${missing.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) manquante(s) : ${escapeHtml(missing.join(', '))}.</p>` : ''}${fileErrors.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) non consultable(s) : ${escapeHtml(fileErrors.join(' ; '))}. Vérifiez le bucket privé et les politiques Storage.</p>` : ''}</div>${assignment}<form class="space-y-2" onsubmit="adminReviewRoleApplication(event,'${a.id}','${a.application_type}')"><div><label class="block text-[10px] font-bold text-slate-600 mb-1">Note de décision (facultative)</label><textarea name="note" rows="2" maxlength="1000" class="auth-input" placeholder="Motif du refus, réserve ou commentaire administratif"></textarea></div><div class="flex flex-wrap items-center gap-2">${approvalAllowed ? `<button name="decision" value="approved" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold"><i class="fas fa-check mr-1"></i>Approuver la candidature</button>` : `<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-4 py-2.5 text-xs font-bold cursor-not-allowed">Approbation bloquée : justificatifs à vérifier</button>`}<button name="decision" value="rejected" class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2.5 text-xs font-bold">Refuser la candidature</button></div></form></article>`);
+        cards.push(`<article class="rounded-xl border border-indigo-200 bg-white p-4 md:p-5 space-y-3 shadow-sm"><div class="flex flex-col lg:flex-row lg:justify-between gap-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h5 class="font-bold text-base text-navy-950">${escapeHtml(a.applicant_name || 'Nom non renseigné')}</h5><span class="rounded-full bg-amber-100 text-amber-900 px-2.5 py-1 text-[10px] font-bold">En attente</span><span class="rounded-full bg-indigo-100 text-indigo-900 px-2.5 py-1 text-[10px] font-bold">${typeLabel(a.application_type)}</span></div><div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 mt-2 text-xs text-slate-700"><p><span class="text-slate-500">E-mail :</span> ${escapeHtml(a.applicant_email || 'Non renseigné')}</p><p><span class="text-slate-500">Téléphone :</span> ${escapeHtml(a.phone || 'Non renseigné')}</p><p><span class="text-slate-500">Organisation :</span> ${escapeHtml(a.organization_name || 'Sans objet / non renseignée')}</p><p><span class="text-slate-500">Spécialité :</span> ${escapeHtml(a.specialty || 'Non renseignée')}</p><p><span class="text-slate-500">Diplôme :</span> ${escapeHtml(a.diploma_level || 'Non renseigné')}</p><p><span class="text-slate-500">Candidature déposée :</span> ${a.created_at ? new Date(a.created_at).toLocaleString('fr-FR') : 'Date inconnue'}</p><p class="sm:col-span-2 xl:col-span-3"><span class="text-slate-500">Référence du dossier :</span> <span class="font-mono">${escapeHtml(a.id)}</span></p></div>${paymentDetails}</div></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><p class="text-xs font-bold text-slate-800 mb-2">Pièces justificatives — ouvrir chaque document avant la décision</p><div class="flex flex-wrap gap-2">${links.join('') || '<span class="text-xs text-rose-700">Aucun justificatif consultable.</span>'}</div>${missing.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) manquante(s) : ${escapeHtml(missing.join(', '))}.</p>` : ''}${fileErrors.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) non consultable(s) : ${escapeHtml(fileErrors.join(' ; '))}. Vérifiez le bucket privé et les politiques Storage.</p>` : ''}</div>${assignment}<form class="space-y-2" onsubmit="adminReviewRoleApplication(event,'${a.id}','${a.application_type}')"><div><label class="block text-[10px] font-bold text-slate-600 mb-1">Note de décision (facultative)</label><textarea name="note" rows="2" maxlength="1000" class="auth-input" placeholder="Motif du refus, réserve ou commentaire administratif"></textarea></div><div class="flex flex-wrap items-center gap-2">${approvalAllowed ? `<button type="submit" name="decision" value="approved" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold"><i class="fas fa-check mr-1"></i>Valider la candidature</button>` : `<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-4 py-2.5 text-xs font-bold cursor-not-allowed">Approbation bloquée : justificatifs à vérifier</button>`}<button type="submit" name="decision" value="rejected" class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2.5 text-xs font-bold">Refuser la candidature</button></div></form></article>`);
     }
     const processedHtml = processed.length ? `<details class="rounded-xl border border-slate-200 bg-slate-50 p-3"><summary class="cursor-pointer text-xs font-bold text-slate-700">Historique des candidatures déjà traitées (${processed.length})</summary><div class="space-y-2 mt-3">${processed.map(a => `<div class="rounded-lg border bg-white p-3 text-xs"><div class="flex flex-wrap justify-between gap-2"><strong>${escapeHtml(a.applicant_name || a.applicant_email || 'Candidat')} — ${typeLabel(a.application_type)}</strong><span class="font-bold ${a.status === 'approved' ? 'text-emerald-700' : 'text-rose-700'}">${a.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></div><p class="text-slate-500 mt-1">${escapeHtml(a.applicant_email || '')} • ${a.reviewed_at ? new Date(a.reviewed_at).toLocaleString('fr-FR') : ''}</p>${a.review_note ? `<p class="mt-1">Note : ${escapeHtml(a.review_note)}</p>` : ''}</div>`).join('')}</div></details>` : '';
     el.innerHTML = (cards.length ? cards.join('') : '<div class="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500">Aucune candidature professionnelle en attente.</div>') + processedHtml;
@@ -1037,26 +1045,37 @@ async function renderAdminApplications(apps) {
 
 async function adminReviewRoleApplication(e,id,type){
     e.preventDefault();
-    if(!state.isAdmin)return;
-    const form=e.target; const decision=e.submitter?.value || 'approved';
-    const note=form.elements.note?.value||null;
+    if(!state.isAdmin) return showToast('Action réservée à l’administration.', 'error');
+    const form=e.currentTarget || e.target;
+    const decision=e.submitter?.value || new FormData(form).get('decision') || 'approved';
+    if(!['approved','rejected'].includes(decision)) return showToast('Décision administrative invalide.', 'error');
+    const note=form.elements.note?.value?.trim() || null;
     let subject=null,series=[];
-    if(type==='teacher'&&decision==='approved'){
-        subject=form.elements.subject.value.trim();
+    if(type==='teacher' && decision==='approved'){
+        subject=form.elements.subject?.value?.trim() || '';
         series=[...form.querySelectorAll('input[name="series"]:checked')].map(x=>x.value);
-        if(!subject||!series.length)return showToast('Confirmez la matière et au moins une série avant d’approuver.', 'error');
+        if(!subject || !series.length) return showToast('Pour approuver un enseignant, confirmez la matière et au moins une classe.', 'error');
     }
+    const buttons=[...form.querySelectorAll('button[type="submit"]')];
+    buttons.forEach(button=>{button.disabled=true;button.dataset.previousText=button.textContent;});
+    if(e.submitter) e.submitter.textContent='Traitement…';
     try{
-        let result;
-        if(type==='teacher'&&decision==='approved'){
-            result=await supabaseClient.rpc('admin_finalize_teacher_application',{p_application_id:id,p_review_note:note,p_subject_name:subject,p_target_series:series});
-        }else{
-            result=await supabaseClient.rpc('admin_review_role_application',{p_application_id:id,p_decision:decision,p_review_note:note});
-        }
-        if(result.error)throw result.error;
-        showToast(decision==='approved'?'Candidature approuvée.':'Candidature refusée.','success');
+        const {data,error}=await supabaseClient.rpc('admin_decide_role_application',{
+            p_application_id:id,
+            p_decision:decision,
+            p_review_note:note,
+            p_subject_name:subject,
+            p_target_series:series
+        });
+        if(error) throw error;
+        showToast(decision==='approved'?'Candidature approuvée. Les éventuelles étapes de paiement restent séparées.':'Candidature refusée.','success');
         await renderAdminLists();
-    }catch(error){showToast(error.message||'Décision non enregistrée.','error');}
+    }catch(error){
+        console.error('Décision de candidature échouée', {id,type,decision,error});
+        showToast(error.message || error.details || 'Décision non enregistrée. Vérifiez la migration 12 et les justificatifs.', 'error');
+    }finally{
+        buttons.forEach(button=>{button.disabled=false;if(button.dataset.previousText)button.textContent=button.dataset.previousText;});
+    }
 }
 
 async function renderAdminPartnerContributions(rows){
@@ -1065,7 +1084,7 @@ async function renderAdminPartnerContributions(rows){
     const parts=[];
     for(const x of pending){const {data:pr}=await supabaseClient.from('profiles').select('full_name,email,phone').eq('id',x.user_id).maybeSingle();const {data}=await supabaseClient.storage.from('partner-payment-proofs').createSignedUrl(x.proof_path,900);
       parts.push(`<div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-2"><div class="flex flex-wrap items-center justify-between gap-2"><p class="text-sm font-bold">${escapeHtml(pr?.full_name||pr?.email||x.user_id)} • ${Number(x.amount_ar||100000).toLocaleString('fr-FR')} Ar</p><span class="text-[10px] rounded-full bg-amber-100 text-amber-900 px-2 py-1 font-bold">En attente</span></div><p class="text-xs text-slate-700">E-mail : ${escapeHtml(pr?.email||'Non renseigné')} • Téléphone : ${escapeHtml(pr?.phone||'Non renseigné')}</p><p class="text-xs">Mode : <strong>${escapeHtml(x.payment_method)}</strong> • Référence : <strong>${escapeHtml(x.payment_reference)}</strong></p><p class="text-xs">Transaction : <span class="font-mono">${escapeHtml(x.transaction_reference)}</span> • Déposée : ${x.created_at?new Date(x.created_at).toLocaleString('fr-FR'):'Date inconnue'}</p>${data?.signedUrl?`<a class="inline-flex text-xs underline font-bold text-indigo-700" target="_blank" rel="noopener noreferrer" href="${escapeHtml(data.signedUrl)}">Consulter la preuve de paiement</a>`:'<span class="text-xs text-rose-700">Preuve privée indisponible — vérifier Storage/RLS ; approbation bloquée.</span>'}
-      <form class="flex flex-wrap gap-2 items-end" onsubmit="adminDecidePartnerContribution(event,'${x.id}')"><label class="text-[10px] text-slate-600">Fin de validité du ticket annuel<input name="ticket_until" type="date" class="auth-input max-w-48 block" aria-label="Fin de validité du ticket annuel"></label>${data?.signedUrl?'<button name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Valider la cotisation</button>':'<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-3 py-2 text-xs font-bold">Validation bloquée</button>'}<button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></form><p class="text-[10px] text-slate-500">La date de fin du ticket doit correspondre à la fin réelle de l’année scolaire, confirmée par la direction.</p></div>`);
+      <form class="flex flex-wrap gap-2 items-end" onsubmit="adminDecidePartnerContribution(event,'${x.id}')"><label class="text-[10px] text-slate-600">Fin de validité du ticket annuel<input name="ticket_until" type="date" class="auth-input max-w-48 block" aria-label="Fin de validité du ticket annuel"></label>${data?.signedUrl?'<button type="submit" name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Valider la cotisation</button>':'<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-3 py-2 text-xs font-bold">Validation bloquée</button>'}<button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></form><p class="text-[10px] text-slate-500">La date de fin du ticket doit correspondre à la fin réelle de l’année scolaire, confirmée par la direction.</p></div>`);
     }
     el.innerHTML=parts.join('')+(processed.length?`<details class="rounded-lg border p-3 mt-2"><summary class="cursor-pointer text-xs font-bold">Historique des cotisations traitées (${processed.length})</summary><div class="mt-2 space-y-1">${processed.map(x=>`<p class="text-xs">${Number(x.amount_ar||0).toLocaleString('fr-FR')} Ar • ${escapeHtml(x.payment_method)} • ${escapeHtml(x.status)} • ${x.created_at?new Date(x.created_at).toLocaleString('fr-FR'):''}</p>`).join('')}</div></details>`:'');
 }
@@ -1079,7 +1098,7 @@ async function adminDecidePartnerContribution(e,id){
 
 function renderAdminFinanceRequests(rows){
     const el=document.getElementById('admin-finance-requests-list');if(!el)return;const pending=rows.filter(x=>x.status==='pending');
-    el.innerHTML=pending.length?pending.map(x=>`<div class="rounded-xl border p-3 space-y-2"><p class="text-xs font-bold">${escapeHtml(x.request_type)} • ${Number(x.amount_ar).toLocaleString('fr-FR')} Ar • ${escapeHtml(x.user_id)}</p><p class="text-[10px] text-slate-500">${new Date(x.created_at).toLocaleString('fr-FR')}</p><form class="flex flex-wrap gap-2" onsubmit="adminReviewFinance(event,'${x.id}')"><input name="transfer_reference" class="auth-input flex-grow" placeholder="Référence du virement effectué (obligatoire pour approuver)"><button name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Marquer payé</button><button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></form></div>`).join(''):'<p class="text-xs text-slate-500">Aucune demande financière en attente.</p>';
+    el.innerHTML=pending.length?pending.map(x=>`<div class="rounded-xl border p-3 space-y-2"><p class="text-xs font-bold">${escapeHtml(x.request_type)} • ${Number(x.amount_ar).toLocaleString('fr-FR')} Ar • ${escapeHtml(x.user_id)}</p><p class="text-[10px] text-slate-500">${new Date(x.created_at).toLocaleString('fr-FR')}</p><form class="flex flex-wrap gap-2" onsubmit="adminReviewFinance(event,'${x.id}')"><input name="transfer_reference" class="auth-input flex-grow" placeholder="Référence du virement effectué (obligatoire pour approuver)"><button type="submit" name="decision" value="approved" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-bold">Marquer payé</button><button name="decision" value="rejected" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-xs font-bold">Refuser</button></form></div>`).join(''):'<p class="text-xs text-slate-500">Aucune demande financière en attente.</p>';
 }
 
 async function adminReviewFinance(e,id){e.preventDefault();const decision=e.submitter?.value||'approved';const ref=e.target.elements.transfer_reference.value.trim();if(decision==='approved'&&!ref)return showToast('Entrez la référence du virement réellement effectué.','error');try{const {error}=await supabaseClient.rpc('admin_review_finance_request',{p_request_id:id,p_decision:decision,p_transfer_reference:decision==='approved'?ref:null,p_review_note:null});if(error)throw error;showToast('Demande financière mise à jour.','success');await renderAdminLists();}catch(error){showToast(error.message||'Action impossible.','error');}}
