@@ -7,28 +7,9 @@
 
 begin;
 
--- 1) Ajouter Troisième aux contraintes de données sans supprimer les anciennes séries.
-do $$
-declare
-  c record;
-begin
-  for c in
-    select conrelid::regclass as table_name, conname
-    from pg_constraint
-    where contype = 'c'
-      and conrelid in (
-        'public.profiles'::regclass,
-        'public.subscriptions'::regclass,
-        'public.student_messages'::regclass,
-        'public.course_release_schedule'::regclass
-      )
-      and pg_get_constraintdef(oid) ilike '%series%'
-  loop
-    execute format('alter table %s drop constraint %I', c.table_name, c.conname);
-  end loop;
-end
-$$;
-
+-- 1) Mettre à jour explicitement les contraintes qui portent une série.
+--    Les anciennes valeurs restent présentes pour assurer la compatibilité historique.
+alter table public.profiles drop constraint if exists profiles_series_check;
 alter table public.profiles
   add constraint profiles_series_check
   check (series in (
@@ -36,6 +17,7 @@ alter table public.profiles
     'Terminale L','Terminale S','Terminale OSE','Administrateur','Candidat'
   ));
 
+alter table public.subscriptions drop constraint if exists subscriptions_series_check;
 alter table public.subscriptions
   add constraint subscriptions_series_check
   check (series in (
@@ -43,6 +25,7 @@ alter table public.subscriptions
     'Terminale L','Terminale S','Terminale OSE'
   ));
 
+alter table public.student_messages drop constraint if exists student_messages_series_check;
 alter table public.student_messages
   add constraint student_messages_series_check
   check (series in (
@@ -50,12 +33,22 @@ alter table public.student_messages
     'Terminale L','Terminale S','Terminale OSE'
   ));
 
+alter table public.course_release_schedule drop constraint if exists course_release_schedule_series_check;
 alter table public.course_release_schedule
   add constraint course_release_schedule_series_check
   check (series in (
     'Troisième','Seconde','Première','Première L','Première S','Première OSE',
     'Terminale L','Terminale S','Terminale OSE'
   ));
+
+-- Une candidature rejetée peut être corrigée puis redéposée sur le même compte.
+-- Une seule candidature en attente est autorisée par type et par compte.
+alter table public.role_applications
+  drop constraint if exists role_applications_user_id_application_type_key;
+drop index if exists public.role_applications_one_pending_per_type;
+create unique index role_applications_one_pending_per_type
+  on public.role_applications(user_id,application_type)
+  where status='pending';
 
 -- 2) Une seule source de vérité pour les nouvelles inscriptions.
 --    Les profils administrateur et candidat conservent leur traitement dédié.
