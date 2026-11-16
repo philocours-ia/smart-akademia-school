@@ -254,6 +254,112 @@ $$;
 revoke all on function public.admin_review_role_application(uuid,text,text) from public,anon;
 grant execute on function public.admin_review_role_application(uuid,text,text) to authenticated;
 
+
+-- 3) Fonctions de vérification et de liste : exécution admin uniquement,
+--    avec search_path vide et relations entièrement qualifiées.
+create or replace function public.admin_verify_akademia_mvola_profile(
+  p_user_id uuid,
+  p_verified boolean,
+  p_note text default null
+) returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  p public.profiles%rowtype;
+begin
+  if not public.is_admin() then
+    raise exception 'Action réservée à l’administrateur.';
+  end if;
+
+  select * into p
+  from public.profiles
+  where id=p_user_id
+  for update;
+  if not found then
+    raise exception 'Profil destinataire introuvable.';
+  end if;
+  if p.role not in ('applicant','teacher','partner','promoter') then
+    raise exception 'Ce profil n’est pas un bénéficiaire professionnel.';
+  end if;
+
+  if p_verified then
+    if p.mvola_number is null
+       or p.mvola_number !~ '^0(32|33|34|38|39)[0-9]{7}
+-- Vérifications en lecture seule :
+-- select proname from pg_proc where pronamespace='public'::regnamespace
+--   and proname in ('save_akademia_mvola_profile','admin_review_role_application');
+-- select application_type,status,count(*) from public.role_applications
+--   group by application_type,status order by application_type,status;
+
+       or nullif(trim(p.mvola_account_name),'') is null
+       or p.mvola_owner_confirmed is distinct from true then
+      raise exception 'Le numéro, le nom du titulaire et la déclaration du candidat doivent être complets.';
+    end if;
+
+    update public.profiles
+      set mvola_verified_at=now(),
+          mvola_verified_by=auth.uid(),
+          mvola_verification_note=nullif(trim(p_note),'')
+    where id=p_user_id;
+
+    update public.role_applications
+      set mvola_verified_at=now(),
+          mvola_verified_by=auth.uid()
+    where user_id=p_user_id and status='pending';
+  else
+    update public.profiles
+      set mvola_verified_at=null,
+          mvola_verified_by=null,
+          mvola_verification_note=nullif(trim(p_note),'')
+    where id=p_user_id;
+
+    update public.role_applications
+      set mvola_verified_at=null,
+          mvola_verified_by=null
+    where user_id=p_user_id and status='pending';
+  end if;
+
+  return true;
+end;
+$;
+revoke all on function public.admin_verify_akademia_mvola_profile(uuid,boolean,text) from public,anon;
+grant execute on function public.admin_verify_akademia_mvola_profile(uuid,boolean,text) to authenticated;
+
+create or replace function public.list_akademia_mvola_profiles()
+returns table(
+  user_id uuid,
+  full_name text,
+  email text,
+  role text,
+  mvola_number text,
+  mvola_account_name text,
+  mvola_owner_confirmed boolean,
+  mvola_verified_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $
+begin
+  if not public.is_admin() then
+    raise exception 'Liste des comptes MVola réservée à l’administration.';
+  end if;
+
+  return query
+    select p.id,p.full_name,p.email,p.role,p.mvola_number,p.mvola_account_name,
+           p.mvola_owner_confirmed,p.mvola_verified_at
+    from public.profiles p
+    where p.role in ('teacher','partner','promoter')
+      and p.registration_status='approved'
+    order by p.role,p.full_name;
+end;
+$;
+revoke all on function public.list_akademia_mvola_profiles() from public,anon;
+grant execute on function public.list_akademia_mvola_profiles() to authenticated;
+
 commit;
 
 -- Vérifications en lecture seule :
