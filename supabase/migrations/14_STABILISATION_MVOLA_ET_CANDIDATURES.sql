@@ -265,7 +265,7 @@ create or replace function public.admin_verify_akademia_mvola_profile(
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   p public.profiles%rowtype;
 begin
@@ -286,13 +286,7 @@ begin
 
   if p_verified then
     if p.mvola_number is null
-       or p.mvola_number !~ '^0(32|33|34|38|39)[0-9]{7}
--- Vérifications en lecture seule :
--- select proname from pg_proc where pronamespace='public'::regnamespace
---   and proname in ('save_akademia_mvola_profile','admin_review_role_application');
--- select application_type,status,count(*) from public.role_applications
---   group by application_type,status order by application_type,status;
-
+       or p.mvola_number !~ '^0(32|33|34|38|39)[0-9]{7}$'
        or nullif(trim(p.mvola_account_name),'') is null
        or p.mvola_owner_confirmed is distinct from true then
       raise exception 'Le numéro, le nom du titulaire et la déclaration du candidat doivent être complets.';
@@ -323,7 +317,7 @@ begin
 
   return true;
 end;
-$;
+$$;
 revoke all on function public.admin_verify_akademia_mvola_profile(uuid,boolean,text) from public,anon;
 grant execute on function public.admin_verify_akademia_mvola_profile(uuid,boolean,text) to authenticated;
 
@@ -342,7 +336,7 @@ language plpgsql
 stable
 security definer
 set search_path = ''
-as $
+as $$
 begin
   if not public.is_admin() then
     raise exception 'Liste des comptes MVola réservée à l’administration.';
@@ -356,7 +350,7 @@ begin
       and p.registration_status='approved'
     order by p.role,p.full_name;
 end;
-$;
+$$;
 revoke all on function public.list_akademia_mvola_profiles() from public,anon;
 grant execute on function public.list_akademia_mvola_profiles() to authenticated;
 
