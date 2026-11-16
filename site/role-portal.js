@@ -335,13 +335,69 @@ async function renderRolePortal() {
     try {
         if (user.role === 'student' && user.registrationStatus !== 'approved') return await renderStudentEnrollmentWorkspace(host, user);
         if (user.role === 'applicant') return await renderApplicantWorkspace(host, user);
-        if (user.role === 'teacher') return await renderTeacherWorkspace(host, user);
-        if (user.role === 'partner') return await renderPartnerWorkspace(host, user);
-        if (user.role === 'promoter') return await renderPromoterWorkspace(host, user);
+        if (user.role === 'teacher') {
+            await renderTeacherWorkspace(host, user);
+            await prependMvolaProfileSettings(host, user);
+            return;
+        }
+        if (user.role === 'partner') {
+            await renderPartnerWorkspace(host, user);
+            await prependMvolaProfileSettings(host, user);
+            return;
+        }
+        if (user.role === 'promoter') {
+            await renderPromoterWorkspace(host, user);
+            await prependMvolaProfileSettings(host, user);
+            return;
+        }
         host.innerHTML = `<section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900 space-y-2"><strong>Votre espace n’est pas associé à un profil reconnu.</strong><p>Rôle reçu : ${escapeHtml(user.role || 'non renseigné')}. Contactez l’administration pour vérifier votre profil.</p><button onclick="logoutRolePortal()" class="rounded-lg border px-3 py-2 text-xs font-bold">Retour à la connexion</button></section>`;
     } catch (error) {
         console.error('Chargement de l’espace Smart Akademia :', error);
         host.innerHTML = `<section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-950 space-y-3"><strong>Le chargement de votre espace a rencontré une erreur inattendue.</strong><p class="text-xs">La session reste ouverte. Vous pouvez réessayer sans créer un autre compte.</p><details class="rounded-lg border border-rose-200 bg-white p-3"><summary class="cursor-pointer text-xs font-bold">Détail technique</summary><p class="mt-2 text-xs break-words">${escapeHtml(error?.message || String(error))}</p></details><button type="button" onclick="refreshRolePortal()" class="rounded-lg bg-navy-900 text-gold-400 px-4 py-2 text-xs font-bold">Réessayer</button></section>`;
+    }
+}
+
+async function prependMvolaProfileSettings(host, user) {
+    if (!host || !user?.id || !['teacher','partner','promoter'].includes(user.role)) return;
+    const { data, error } = await supabaseClient.from('profiles')
+        .select('mvola_number,mvola_account_name,mvola_owner_confirmed,mvola_verified_at')
+        .eq('id', user.id).maybeSingle();
+    const card = document.createElement('section');
+    card.className = 'mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 space-y-3';
+    if (error) {
+        card.innerHTML = `<p class="text-sm font-bold text-indigo-950">Coordonnées de paiement professionnel</p><p class="text-xs text-indigo-900">La rubrique MVola n’est pas disponible. Vérifiez que la migration 13 est appliquée. ${escapeHtml(error.message || '')}</p>`;
+    } else {
+        const profile = data || {};
+        card.innerHTML = `<div><p class="text-xs uppercase tracking-widest font-bold text-indigo-700">Coordonnées de paiement professionnel</p><h3 class="font-bold text-indigo-950 mt-1">Mon compte MVola</h3><p class="text-[11px] text-indigo-800 mt-1">Le titulaire et les coordonnées doivent être vérifiés par l’administration avant toute validation de paiement.</p></div>
+            <p class="text-xs ${profile.mvola_verified_at ? 'text-emerald-800' : 'text-amber-800'}">${profile.mvola_verified_at ? 'Titulaire vérifié par l’administration.' : 'Titulaire non encore vérifié.'}</p>
+            <form onsubmit="saveProfessionalMvolaProfile(event)" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div><label class="block text-xs font-bold mb-1">Numéro MVola</label><input name="mvola_number" type="tel" required maxlength="24" class="auth-input" value="${escapeHtml(profile.mvola_number || '')}" placeholder="034XXXXXXX ou +26134XXXXXXX"></div>
+                <div><label class="block text-xs font-bold mb-1">Nom exact du titulaire</label><input name="mvola_account_name" type="text" required minlength="3" maxlength="120" class="auth-input" value="${escapeHtml(profile.mvola_account_name || '')}" placeholder="Nom figurant sur le compte"></div>
+                <label class="md:col-span-2 flex items-start gap-2 text-xs text-slate-700"><input name="mvola_owner_confirmed" type="checkbox" required class="mt-0.5" ${profile.mvola_owner_confirmed ? 'checked' : ''}> Je confirme que ce compte MVola est enregistré au nom indiqué.</label>
+                <div class="md:col-span-2"><button type="submit" class="rounded-lg bg-indigo-700 text-white px-4 py-2.5 text-xs font-bold">Enregistrer mes coordonnées</button></div>
+            </form>`;
+    }
+    host.prepend(card);
+}
+
+async function saveProfessionalMvolaProfile(e) {
+    e.preventDefault();
+    const user = state.currentUser;
+    if (!user?.id || !['teacher','partner','promoter'].includes(user.role) || !supabaseClient) {
+        return showToast('Cette action est réservée aux comptes professionnels actifs.', 'error');
+    }
+    const form = e.currentTarget;
+    try {
+        const { error } = await supabaseClient.rpc('save_akademia_mvola_profile', {
+            p_mvola_number: form.elements.mvola_number.value.trim(),
+            p_mvola_account_name: form.elements.mvola_account_name.value.trim(),
+            p_owner_confirmed: form.elements.mvola_owner_confirmed.checked === true
+        });
+        if (error) throw error;
+        showToast('Coordonnées enregistrées. La vérification administrative reste nécessaire.', 'success');
+        await renderRolePortal();
+    } catch (error) {
+        showToast(error.message || 'Coordonnées MVola non enregistrées.', 'error');
     }
 }
 
@@ -1051,7 +1107,8 @@ async function renderRoleAdminLists() {
         staff: document.getElementById('admin-staff-requests-list'),
         workdays: document.getElementById('admin-teacher-workday-list'),
         resources: document.getElementById('admin-teacher-resources-list'),
-        promoters: document.getElementById('admin-promoter-tracking-list')
+        promoters: document.getElementById('admin-promoter-tracking-list'),
+        mvola: document.getElementById('admin-mvola-profiles-list')
     };
     const queries = await Promise.all([
         supabaseClient.from('role_applications').select('*').order('created_at',{ascending:false}),
@@ -1061,9 +1118,10 @@ async function renderRoleAdminLists() {
         supabaseClient.from('profiles').select('id,full_name,email,series').eq('role','teacher').order('full_name'),
         supabaseClient.from('teacher_resources').select('*').order('created_at',{ascending:false}),
         supabaseClient.from('profiles').select('id,full_name,email,referral_code').eq('role','promoter').order('full_name'),
-        supabaseClient.from('promoter_commissions').select('promoter_id,student_id,amount_ar,created_at').order('created_at',{ascending:false})
+        supabaseClient.from('promoter_commissions').select('promoter_id,student_id,amount_ar,created_at').order('created_at',{ascending:false}),
+        supabaseClient.rpc('list_akademia_mvola_profiles')
     ]);
-    const [apps, partners, finance, staff, teachers, resources, promotersResult, commissionsResult] = queries;
+    const [apps, partners, finance, staff, teachers, resources, promotersResult, commissionsResult, mvolaProfiles] = queries;
     const showError = (node, label, error) => { if (node) node.innerHTML = `<div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>${label} indisponible.</strong><br>${escapeHtml(error?.message || 'Vérifiez les droits RLS et les migrations Supabase correspondantes.')}</div>`; };
 
     if (apps.error) showError(targets.applications, 'Candidatures professionnelles', apps.error);
@@ -1090,6 +1148,30 @@ async function renderRoleAdminLists() {
     else await renderAdminTeacherResources(resources.data || []);
     if (promotersResult.error || commissionsResult.error) showError(targets.promoters, 'Suivi des promoteurs', promotersResult.error || commissionsResult.error);
     else await renderAdminPromoters(promotersResult.data || [], commissionsResult.data || []);
+    if (mvolaProfiles.error) showError(targets.mvola, 'Comptes MVola professionnels', mvolaProfiles.error);
+    else await renderAdminMvolaProfiles(mvolaProfiles.data || []);
+}
+
+async function renderAdminMvolaProfiles(rows) {
+    const el = document.getElementById('admin-mvola-profiles-list');
+    if (!el) return;
+    if (!rows.length) {
+        el.innerHTML = '<p class="text-xs text-slate-500">Aucun compte professionnel à vérifier pour le moment.</p>';
+        return;
+    }
+    el.innerHTML = rows.map(profile => {
+        const complete = !!(profile.mvola_number && profile.mvola_account_name && profile.mvola_owner_confirmed);
+        const verified = !!profile.mvola_verified_at;
+        return `<article class="rounded-xl border border-slate-200 p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-sm">${escapeHtml(profile.full_name || profile.email || profile.user_id)}</strong><span class="rounded-full px-2 py-1 text-[10px] font-bold ${verified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}">${verified ? 'Vérifié' : 'À vérifier'}</span></div>
+            <p class="text-xs text-slate-600">${escapeHtml(profile.role)} • ${escapeHtml(profile.email || '')}</p>
+            <p class="text-xs">Numéro : <strong class="font-mono">${escapeHtml(profile.mvola_number || 'Non renseigné')}</strong></p>
+            <p class="text-xs">Titulaire déclaré : <strong>${escapeHtml(profile.mvola_account_name || 'Non renseigné')}</strong></p>
+            <p class="text-[10px] text-slate-500">${profile.mvola_owner_confirmed ? 'Déclaration du titulaire confirmée par le compte.' : 'Déclaration du titulaire manquante.'}</p>
+            ${complete && !verified ? `<button type="button" onclick="adminVerifyMvolaProfile('${profile.user_id}')" class="rounded-lg bg-indigo-700 text-white px-3 py-2 text-xs font-bold">Confirmer le contrôle du titulaire</button>` : ''}
+            ${verified ? `<p class="text-[10px] text-emerald-800">Vérifié le ${new Date(profile.mvola_verified_at).toLocaleString('fr-FR')}</p>` : ''}
+        </article>`;
+    }).join('');
 }
 
 async function renderAdminApplications(apps) {
@@ -1125,7 +1207,7 @@ async function renderAdminApplications(apps) {
             <p class="text-xs text-violet-900">Numéro : <strong class="font-mono">${escapeHtml(a.mvola_number || 'Non renseigné')}</strong></p>
             <p class="text-xs text-violet-900">Titulaire déclaré : <strong>${escapeHtml(a.mvola_account_name || 'Non renseigné')}</strong></p>
             <p class="text-[11px] ${mvolaVerified ? 'text-emerald-800' : 'text-amber-800'}">${mvolaVerified ? 'Titulaire vérifié par l’administration' : 'Vérification administrative du titulaire requise'}</p>
-            ${mvolaComplete && !mvolaVerified ? `<button type="button" onclick="adminVerifyCandidateMvola('${a.user_id}')" class="rounded-lg bg-violet-700 text-white px-3 py-2 text-xs font-bold">Confirmer le contrôle du titulaire</button>` : ''}
+            ${mvolaComplete && !mvolaVerified ? `<button type="button" onclick="adminVerifyMvolaProfile('${a.user_id}')" class="rounded-lg bg-violet-700 text-white px-3 py-2 text-xs font-bold">Confirmer le contrôle du titulaire</button>` : ''}
         </div>`;
         const missing = [];
         if (!mvolaComplete) missing.push('coordonnées MVola complètes');
@@ -1140,7 +1222,7 @@ async function renderAdminApplications(apps) {
     el.innerHTML = (cards.length ? cards.join('') : '<div class="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500">Aucune candidature professionnelle en attente.</div>') + processedHtml;
 }
 
-async function adminVerifyCandidateMvola(userId) {
+async function adminVerifyMvolaProfile(userId) {
     if (!state.isAdmin || !supabaseClient) return showToast('Action réservée à l’administration.', 'error');
     try {
         const { error } = await supabaseClient.rpc('admin_verify_akademia_mvola_profile', {
@@ -1149,7 +1231,7 @@ async function adminVerifyCandidateMvola(userId) {
             p_note: 'Contrôle manuel effectué par l’administration.'
         });
         if (error) throw error;
-        showToast('Contrôle MVola enregistré. La candidature peut être réexaminée.', 'success');
+        showToast('Vérification du compte MVola enregistrée.', 'success');
         await renderAdminLists();
     } catch (error) {
         showToast(error.message || 'Vérification MVola impossible.', 'error');
