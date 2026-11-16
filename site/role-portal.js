@@ -484,29 +484,50 @@ async function renderApplicantWorkspace(host, user) {
         host.innerHTML = roleMigrationNotice(error);
         return;
     }
+
     const application = data?.[0] || null;
     const evidenceDraft = await getPendingSignupEvidence(user.email).catch(() => null);
     const type = user.requestedRole;
-    const label = type === 'teacher' ? 'Candidature enseignant' : type === 'partner' ? 'Candidature partenaire' : 'Candidature promoteur';
-    const mvolaFields = `<div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
-        <div><p class="text-xs font-bold text-indigo-950">Compte MVola nominatif — coordonnées de versement</p><p class="text-[11px] text-indigo-800 mt-1">Ces coordonnées seront utilisées pour les éventuels paiements professionnels. L’administration doit contrôler le titulaire avant toute approbation.</p></div>
-        <div><label class="block text-xs font-bold mb-1" for="candidate-mvola-number">Numéro MVola</label><input id="candidate-mvola-number" type="tel" required maxlength="24" autocomplete="tel" class="auth-input" value="${escapeHtml(evidenceDraft?.mvolaNumber || application?.mvola_number || '')}" placeholder="034XXXXXXX ou +26134XXXXXXX"></div>
-        <div><label class="block text-xs font-bold mb-1" for="candidate-mvola-account-name">Nom exact du titulaire MVola</label><input id="candidate-mvola-account-name" type="text" required minlength="3" maxlength="120" class="auth-input" value="${escapeHtml(evidenceDraft?.mvolaAccountName || application?.mvola_account_name || '')}" placeholder="Nom correspondant au compte MVola"></div>
-        <label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-mvola-owner-confirmed" type="checkbox" required class="mt-0.5" ${evidenceDraft?.mvolaOwnerConfirmed || application?.mvola_owner_confirmed ? 'checked' : ''}> Je confirme que ce compte MVola est enregistré au nom indiqué ci-dessus.</label>
-    </div>`;
+    const label = type === 'teacher' ? 'Candidature enseignant'
+        : type === 'partner' ? 'Candidature partenaire' : 'Candidature promoteur';
+
+    const mvolaNumber = evidenceDraft?.mvolaNumber || application?.mvola_number || '';
+    const mvolaName = evidenceDraft?.mvolaAccountName || application?.mvola_account_name || '';
+    const mvolaConfirmed = evidenceDraft?.mvolaOwnerConfirmed || application?.mvola_owner_confirmed;
+    const mvolaFields =
+        '<div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">' +
+          '<div><p class="text-xs font-bold text-indigo-950">Compte MVola nominatif — coordonnées de versement</p>' +
+          '<p class="text-[11px] text-indigo-800 mt-1">Ces coordonnées seront utilisées pour les éventuels paiements professionnels. L’administration doit contrôler le titulaire avant toute approbation.</p></div>' +
+          '<div><label class="block text-xs font-bold mb-1" for="candidate-mvola-number">Numéro MVola</label>' +
+          '<input id="candidate-mvola-number" type="tel" required maxlength="24" autocomplete="tel" class="auth-input" value="' + escapeHtml(mvolaNumber) + '" placeholder="034XXXXXXX ou +26134XXXXXXX"></div>' +
+          '<div><label class="block text-xs font-bold mb-1" for="candidate-mvola-account-name">Nom exact du titulaire MVola</label>' +
+          '<input id="candidate-mvola-account-name" type="text" required minlength="3" maxlength="120" class="auth-input" value="' + escapeHtml(mvolaName) + '" placeholder="Nom correspondant au compte MVola"></div>' +
+          '<label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-mvola-owner-confirmed" type="checkbox" required class="mt-0.5" ' +
+          (mvolaConfirmed ? 'checked' : '') + '> Je confirme que ce compte MVola est enregistré au nom indiqué ci-dessus.</label>' +
+        '</div>';
 
     if (application && application.status !== 'rejected') {
         const statusClass = application.status === 'approved' ? 'emerald' : 'amber';
-        host.innerHTML = `<div class="bg-white rounded-2xl p-6 border border-slate-200 space-y-3">
-            <p class="text-xs font-bold uppercase tracking-widest text-slate-500">Votre candidature</p>
-            <h2 class="font-display text-xl font-bold text-navy-900">${escapeHtml(application.application_type === 'teacher' ? 'Enseignant' : application.application_type === 'partner' ? 'Partenaire' : 'Promoteur')}</h2>
-            <span class="inline-block rounded-full px-3 py-1 text-xs font-bold bg-${statusClass}-100 text-${statusClass}-800">${escapeHtml(application.status === 'pending' ? 'En attente de validation' : 'Candidature approuvée')}</span>
-            <p class="text-sm text-slate-600">Déposée le ${new Date(application.created_at).toLocaleString('fr-FR')}.</p>
-            ${application.review_note ? `<p class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Note de l’administration : ${escapeHtml(application.review_note)}</p>` : ''}
-            <p class="text-xs text-slate-500">Votre candidature est enregistrée. Vous pouvez actualiser vos coordonnées MVola tant que la décision administrative n’est pas définitive.</p>
-            <form onsubmit="saveApplicantMvolaProfile(event)" class="space-y-3">${mvolaFields}<button type="submit" class="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-900">Enregistrer / actualiser mes coordonnées MVola</button></form>
-            <button onclick="refreshRolePortal()" class="rounded-xl border px-4 py-2 text-xs font-bold">Actualiser le statut</button>
-        </div>`;
+        const statusText = application.status === 'pending' ? 'En attente de validation' : 'Candidature approuvée';
+        const reviewNote = application.review_note
+            ? '<p class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Note de l’administration : ' + escapeHtml(application.review_note) + '</p>'
+            : '';
+        host.innerHTML =
+            '<div class="bg-white rounded-2xl p-6 border border-slate-200 space-y-3">' +
+              '<p class="text-xs font-bold uppercase tracking-widest text-slate-500">Votre candidature</p>' +
+              '<h2 class="font-display text-xl font-bold text-navy-900">' +
+                escapeHtml(application.application_type === 'teacher' ? 'Enseignant' : application.application_type === 'partner' ? 'Partenaire' : 'Promoteur') +
+              '</h2>' +
+              '<span class="inline-block rounded-full px-3 py-1 text-xs font-bold bg-' + statusClass + '-100 text-' + statusClass + '-800">' +
+                escapeHtml(statusText) + '</span>' +
+              '<p class="text-sm text-slate-600">Déposée le ' + new Date(application.created_at).toLocaleString('fr-FR') + '.</p>' +
+              reviewNote +
+              '<p class="text-xs text-slate-500">Votre candidature est enregistrée. Vous pouvez actualiser vos coordonnées MVola tant que la décision administrative n’est pas définitive.</p>' +
+              '<form onsubmit="saveApplicantMvolaProfile(event)" class="space-y-3">' + mvolaFields +
+                '<button type="submit" class="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-900">Enregistrer / actualiser mes coordonnées MVola</button>' +
+              '</form>' +
+              '<button onclick="refreshRolePortal()" class="rounded-xl border px-4 py-2 text-xs font-bold">Actualiser le statut</button>' +
+            '</div>';
         return;
     }
 
@@ -514,66 +535,85 @@ async function renderApplicantWorkspace(host, user) {
         host.innerHTML = '<div class="bg-white rounded-2xl p-6 border border-rose-200 text-sm text-rose-800">Le type de candidature n’est pas configuré sur ce profil. Contactez l’administration.</div>';
         return;
     }
+
     const paths = evidenceDraft?.uploadedPaths || {};
     const hasTeacherProofs = !!(paths.identity_photo && paths.diploma_proof);
     const hasPartnerProof = !!paths.payment_proof;
     let typeFields = '';
+
     if (type === 'teacher') {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label><input id="candidate-specialty" required maxlength="120" class="auth-input" value="${escapeHtml(evidenceDraft?.specialty || application?.specialty || '')}" placeholder="Intitulé exact figurant dans votre PE de référence"><p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE retenus. Aucun catalogue officiel non vérifié n’est présélectionné.</p></div>
-        <div><label class="block text-xs font-bold mb-1">Diplôme le plus élevé</label><input id="candidate-diploma-level" required maxlength="120" class="auth-input" value="${escapeHtml(application?.diploma_level || '')}" placeholder="Intitulé du diplôme"></div>
-        ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Joignez la photo d’identité et la preuve du diplôme avant le dépôt.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
+        const proofFields = hasTeacherProofs
+            ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues et transférées dans le stockage privé.</div>'
+            : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Joignez la photo d’identité et la preuve du diplôme avant le dépôt.</div>' +
+              '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
+                '<div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div>' +
+                '<div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>' +
+              '</div>';
+        typeFields =
+            '<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label>' +
+            '<input id="candidate-specialty" required maxlength="120" class="auth-input" value="' + escapeHtml(evidenceDraft?.specialty || application?.specialty || '') + '" placeholder="Intitulé exact figurant dans votre PE de référence">' +
+            '<p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE vérifiés.</p></div>' +
+            '<div><label class="block text-xs font-bold mb-1">Diplôme le plus élevé</label>' +
+            '<input id="candidate-diploma-level" required maxlength="120" class="auth-input" value="' + escapeHtml(application?.diploma_level || '') + '" placeholder="Intitulé du diplôme"></div>' +
+            proofFields;
     } else if (type === 'promoter') {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label><select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option><option ${(evidenceDraft?.diplomaLevel || application?.diploma_level) === 'Baccalauréat' ? 'selected' : ''}>Baccalauréat</option><option ${(evidenceDraft?.diplomaLevel || application?.diploma_level) === 'Bac+2' ? 'selected' : ''}>Bac+2</option><option ${(evidenceDraft?.diplomaLevel || application?.diploma_level) === 'Licence' ? 'selected' : ''}>Licence</option><option ${(evidenceDraft?.diplomaLevel || application?.diploma_level) === 'Master' ? 'selected' : ''}>Master</option><option ${(evidenceDraft?.diplomaLevel || application?.diploma_level) === 'Doctorat' ? 'selected' : ''}>Doctorat</option></select><p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>
-        ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Joignez la photo d’identité et la preuve du diplôme avant le dépôt.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
+        const levels = ['Baccalauréat', 'Bac+2', 'Licence', 'Master', 'Doctorat'];
+        const currentLevel = evidenceDraft?.diplomaLevel || application?.diploma_level || '';
+        const levelOptions = levels.map(level =>
+            '<option value="' + escapeHtml(level) + '"' + (currentLevel === level ? ' selected' : '') + '>' + escapeHtml(level) + '</option>'
+        ).join('');
+        const proofFields = hasTeacherProofs
+            ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues et transférées dans le stockage privé.</div>'
+            : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Joignez la photo d’identité et la preuve du diplôme avant le dépôt.</div>' +
+              '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
+                '<div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div>' +
+                '<div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>' +
+              '</div>';
+        typeFields =
+            '<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label>' +
+            '<select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option>' + levelOptions + '</select>' +
+            '<p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>' +
+            proofFields;
     } else {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label><input id="candidate-organization" required maxlength="180" class="auth-input" value="${escapeHtml(evidenceDraft?.organizationName || application?.organization_name || user.name || '')}"></div>
-        <label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5" ${application?.monthly_commitment_accepted ? 'checked' : ''}> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme.</label>
-        ${hasPartnerProof ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Preuve de première cotisation reçue et transférée dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La preuve de la première cotisation de 100 000 Ar et la référence FINANCEMENT sont obligatoires.</div><div><label class="block text-xs font-bold mb-1">Mode de paiement</label><select id="candidate-partner-payment-method" required class="auth-input"><option value="">Choisir</option><option value="MVola" ${evidenceDraft?.paymentMethod === 'MVola' ? 'selected' : ''}>MVola</option><option value="Binance Pay" ${evidenceDraft?.paymentMethod === 'Binance Pay' ? 'selected' : ''}>Binance Pay</option></select></div><div><label class="block text-xs font-bold mb-1">Référence de transaction</label><input id="candidate-partner-transaction-reference" required minlength="3" class="auth-input" value="${escapeHtml(evidenceDraft?.transactionReference || '')}"></div><div><label class="block text-xs font-bold mb-1">Preuve de paiement</label><input id="candidate-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>'}`;
+        const commitmentChecked = application?.monthly_commitment_accepted ? ' checked' : '';
+        const proofFields = hasPartnerProof
+            ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Preuve de première cotisation reçue et transférée dans le stockage privé.</div>'
+            : '<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La preuve de la première cotisation de 100 000 Ar et la référence FINANCEMENT sont obligatoires.</div>' +
+              '<div><label class="block text-xs font-bold mb-1">Mode de paiement</label><select id="candidate-partner-payment-method" required class="auth-input">' +
+                '<option value="">Choisir</option><option value="MVola"' + (evidenceDraft?.paymentMethod === 'MVola' ? ' selected' : '') + '>MVola</option>' +
+                '<option value="Binance Pay"' + (evidenceDraft?.paymentMethod === 'Binance Pay' ? ' selected' : '') + '>Binance Pay</option>' +
+              '</select></div>' +
+              '<div><label class="block text-xs font-bold mb-1">Référence de transaction</label>' +
+                '<input id="candidate-partner-transaction-reference" required minlength="3" class="auth-input" value="' + escapeHtml(evidenceDraft?.transactionReference || '') + '">' +
+              '</div>' +
+              '<div><label class="block text-xs font-bold mb-1">Preuve de paiement</label><input id="candidate-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>';
+        typeFields =
+            '<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label>' +
+            '<input id="candidate-organization" required maxlength="180" class="auth-input" value="' + escapeHtml(evidenceDraft?.organizationName || application?.organization_name || user.name || '') + '"></div>' +
+            '<label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5"' + commitmentChecked + '> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme.</label>' +
+            proofFields;
     }
 
     const rejectedNotice = application?.status === 'rejected'
-        ? `<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><strong>Votre précédente candidature a été refusée.</strong>${application.review_note ? `<p class="mt-1">Motif : ${escapeHtml(application.review_note)}</p>` : ''}<p class="mt-1 text-xs">Corrigez les éléments demandés puis déposez une nouvelle candidature avec le même compte.</p></div>`
+        ? '<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><strong>Votre précédente candidature a été refusée.</strong>' +
+          (application.review_note ? '<p class="mt-1">Motif : ' + escapeHtml(application.review_note) + '</p>' : '') +
+          '<p class="mt-1 text-xs">Corrigez les éléments demandés puis déposez une nouvelle candidature avec le même compte.</p></div>'
         : '';
+    const submitLabel = application?.status === 'rejected' ? 'Redéposer ma candidature' : 'Déposer ma candidature';
 
-    host.innerHTML = `<div class="bg-white rounded-2xl p-5 md:p-7 border border-slate-200 space-y-4">
-        ${rejectedNotice}
-        <div><p class="text-xs uppercase tracking-widest font-bold text-gold-600">Dossier à compléter</p><h2 class="font-display text-xl font-bold text-navy-900 mt-1">${label}</h2><p class="text-sm text-slate-600 mt-2">Compte : ${escapeHtml(user.email)} • ${escapeHtml(user.phone || 'Téléphone non renseigné')}</p></div>
-        <form id="role-application-form" onsubmit="submitRoleApplication(event)" class="space-y-4">
-          ${mvolaFields}
-          ${typeFields}
-          <div><label class="block text-xs font-bold mb-1">Informations complémentaires (facultatif)</label><textarea id="candidate-extra-note" rows="3" maxlength="2000" class="auth-input" placeholder="Précisions utiles pour l’examen de votre candidature"></textarea></div>
-          <button type="submit" class="rounded-xl bg-navy-900 text-gold-400 px-5 py-3 text-sm font-bold">${application?.status === 'rejected' ? 'Redéposer ma candidature' : 'Déposer ma candidature'}</button>
-        </form>
-        <p class="text-[11px] text-slate-500">Les pièces sont déposées dans un espace privé. Le titulaire MVola est contrôlé manuellement par l’administration ; aucune vérification automatique du compte MVola ou biométrie n’est activée.</p>
-    </div>`;
-}
-
-async function saveApplicantMvolaProfile(e) {
-    e.preventDefault();
-    const user = state.currentUser;
-    if (!user || user.role !== 'applicant' || !supabaseClient) return showToast('Session candidat invalide.', 'error');
-    const number = document.getElementById('candidate-mvola-number')?.value.trim();
-    const accountName = document.getElementById('candidate-mvola-account-name')?.value.trim();
-    const confirmed = document.getElementById('candidate-mvola-owner-confirmed')?.checked === true;
-    try {
-        const { data, error } = await supabaseClient.rpc('save_akademia_mvola_profile', {
-            p_mvola_number: number,
-            p_mvola_account_name: accountName,
-            p_owner_confirmed: confirmed
-        });
-        if (error) throw error;
-        const draft = await getPendingSignupEvidence(user.email).catch(() => null);
-        if (draft) await savePendingSignupEvidence(user.email, {
-            ...draft,
-            mvolaNumber: data?.mvola_number || number,
-            mvolaAccountName: data?.mvola_account_name || accountName,
-            mvolaOwnerConfirmed: true
-        });
-        showToast('Coordonnées MVola enregistrées. La vérification administrative reste en attente.', 'success');
-        await renderRolePortal();
-    } catch (error) {
-        showToast(error.message || 'Coordonnées MVola non enregistrées.', 'error');
-    }
+    host.innerHTML =
+        '<div class="bg-white rounded-2xl p-5 md:p-7 border border-slate-200 space-y-4">' +
+          rejectedNotice +
+          '<div><p class="text-xs uppercase tracking-widest font-bold text-gold-600">Dossier à compléter</p>' +
+            '<h2 class="font-display text-xl font-bold text-navy-900 mt-1">' + label + '</h2>' +
+            '<p class="text-sm text-slate-600 mt-2">Compte : ' + escapeHtml(user.email) + ' • ' + escapeHtml(user.phone || 'Téléphone non renseigné') + '</p></div>' +
+          '<form id="role-application-form" onsubmit="submitRoleApplication(event)" class="space-y-4">' +
+            mvolaFields + typeFields +
+            '<div><label class="block text-xs font-bold mb-1">Informations complémentaires (facultatif)</label><textarea id="candidate-extra-note" rows="3" maxlength="2000" class="auth-input" placeholder="Précisions utiles pour l’examen de votre candidature"></textarea></div>' +
+            '<button type="submit" class="rounded-xl bg-navy-900 text-gold-400 px-5 py-3 text-sm font-bold">' + submitLabel + '</button>' +
+          '</form>' +
+          '<p class="text-[11px] text-slate-500">Les pièces sont déposées dans un espace privé. Le titulaire MVola est contrôlé manuellement par l’administration ; aucune vérification automatique du compte MVola ou biométrie n’est activée.</p>' +
+        '</div>';
 }
 
 function roleMigrationNotice(error) {
