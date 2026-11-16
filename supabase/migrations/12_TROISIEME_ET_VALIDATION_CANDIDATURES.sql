@@ -56,7 +56,7 @@ create or replace function public.handle_new_akademia_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   chosen_series text;
@@ -164,7 +164,7 @@ create or replace function public.admin_assign_teacher_subject(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   result_id uuid;
@@ -222,7 +222,7 @@ create or replace function public.admin_decide_role_application(
 returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   app public.role_applications%rowtype;
@@ -281,7 +281,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   caller_role text;
