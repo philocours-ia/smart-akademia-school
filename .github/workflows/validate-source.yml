@@ -1,0 +1,79 @@
+name: Validate Smart Akademia sources
+
+on:
+  push:
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  javascript:
+    name: JavaScript syntax and integration checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check application scripts
+        run: |
+          node --check site/role-portal.js
+          node --check site/service-worker.js
+
+      - name: Check inline scripts in index.html
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          html = Path("site/index.html").read_text(encoding="utf-8")
+          pattern = re.compile(
+              r'<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)</script\s*>',
+              re.IGNORECASE
+          )
+          scripts = [body for body in pattern.findall(html) if body.strip()]
+          if not scripts:
+              raise SystemExit("No inline JavaScript block was found.")
+
+          for index, body in enumerate(scripts, start=1):
+              Path(f"/tmp/smart-akademia-inline-{index}.js").write_text(body, encoding="utf-8")
+          print(f"Found {len(scripts)} inline script block(s).")
+          PY
+
+          for file in /tmp/smart-akademia-inline-*.js; do
+            node --check "$file"
+          done
+
+      - name: Check role/RPC/migration integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          portal = Path("site/role-portal.js").read_text(encoding="utf-8")
+          index = Path("site/index.html").read_text(encoding="utf-8")
+          sw = Path("site/service-worker.js").read_text(encoding="utf-8")
+          m12 = Path("supabase/migrations/12_TROISIEME_ET_VALIDATION_CANDIDATURES.sql").read_text(encoding="utf-8")
+          m14 = Path("supabase/migrations/14_STABILISATION_MVOLA_ET_CANDIDATURES.sql").read_text(encoding="utf-8")
+
+          required = {
+              "role decision RPC": "admin_decide_role_application" in m12 and "admin_decide_role_application" in portal,
+              "student teacher assignments RPC": "get_my_course_assignments" in m12 and "get_my_course_assignments" in index,
+              "MVola save RPC": "save_akademia_mvola_profile" in m14 and "save_akademia_mvola_profile" in portal,
+              "MVola admin verification": "admin_verify_akademia_mvola_profile" in portal,
+              "admin MVola container": 'id="admin-mvola-profiles-list"' in index,
+              "PWA cache version": "smart-akademia-school-shell-v18-role-stability-mvola" in sw,
+          }
+          failed = [name for name, passed in required.items() if not passed]
+          for name, passed in required.items():
+              print(f"{'PASS' if passed else 'FAIL'}: {name}")
+          if failed:
+              raise SystemExit("Integration checks failed: " + ", ".join(failed))
+          PY

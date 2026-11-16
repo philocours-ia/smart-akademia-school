@@ -15,10 +15,11 @@
 | 11 | `diagnostics/11_DIAGNOSTIC_PORTAILS_UTILISATEURS.sql` | Diagnostic en lecture seule des portails | Diagnostic uniquement, pas une migration |
 | 12 | `migrations/12_TROISIEME_ET_VALIDATION_CANDIDATURES.sql` | Classe Troisième/T9, limites des nouvelles inscriptions, RPC explicite de décision admin, liste des enseignants affectés | Après 01–10 |
 | 13 | `migrations/13_MVOLA_COORDONNEES_ET_PREPARATION_PAIE.sql` | Numéros MVola nominatifs, vérification administrative des titulaires et garde serveur avant clôture de paie | Après 01–10 et 12 |
+| 14 | `migrations/14_STABILISATION_MVOLA_ET_CANDIDATURES.sql` | Préserve la vérification MVola lorsqu'un profil inchangé est rechargé et restaure les contrôles de la première cotisation partenaire à l'approbation | Après 01–13 |
 
 ## Ordre complet — projet neuf
 
-01 → 02 → provisionnement compte Auth admin → 03 → 05 → 06 → 07 → 08 → 09 → 10 → 12 → diagnostics 04 et 11.
+01 → 02 → provisionnement compte Auth admin → 03 → 05 → 06 → 07 → 08 → 09 → 10 → 12 → 13 → 14 → diagnostics 04 et 11.
 
 ## Base déjà en test avec 01 à 05
 
@@ -39,3 +40,12 @@ La migration 12 conserve les anciennes valeurs de série dans le schéma afin de
 La migration 13 ajoute les coordonnées MVola des candidats enseignants, partenaires et promoteurs, leurs champs de mise à jour dans les portails et les RPC de contrôle admin. Elle prépare la paie enseignants/promoteurs via la file de demandes et une exportation de rapprochement ; ce CSV n'est pas le modèle d'import officiel MVola. La fonction `admin_review_finance_request()` est renforcée côté serveur : une demande ne peut être marquée payée que si le compte MVola du bénéficiaire est vérifié et si une référence de transfert réelle est fournie.
 
 L'API Merchant Payment pour les encaissements clients n'est pas encore implémentée par la migration 13. Elle nécessite la documentation technique et les paramètres Sandbox liés au compte MVola Developer du propriétaire, puis la procédure GO LIVE MVola. Les secrets restent exclusivement côté backend Supabase Edge Functions.
+
+
+## Correctifs de stabilisation — 16 novembre 2026
+
+La migration 12 est désormais présente dans le dépôt. Elle rend cohérents les nouvelles séries actives (Troisième et Terminale L/S/OSE), ajoute les RPC utilisées par les portails (`admin_decide_role_application()` et `get_my_course_assignments()`) et autorise le redépôt d'une candidature rejetée sur le même compte, avec une seule candidature en attente par type.
+
+La migration 13 est conservée comme migration historique. La migration 14 apporte les corrections complémentaires : une simple reconnexion ne réinitialise plus la vérification du compte MVola si ses coordonnées n'ont pas changé ; l'approbation partenaire conserve la vérification de la preuve et crée seulement une cotisation en attente. L'encaissement n'est jamais marqué comme payé automatiquement.
+
+**Base Supabase déjà utilisée :** consulter l'historique réel des migrations dans Supabase avant exécution. Si 12 ou 13 ont été exécutées manuellement, vérifier leur contenu et leur résultat avant de lancer 14. Ne jamais rejouer 01–13 « pour essayer » sur une base contenant déjà des données.

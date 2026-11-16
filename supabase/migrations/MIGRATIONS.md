@@ -28,3 +28,14 @@ La migration 09 ajoute deux RPC : `get_akademia_admin_supervision()` (admin uniq
 
 
 La migration 10 n'est pas une migration de login ; elle permet de téléverser la preuve de première cotisation d'un partenaire pendant que son profil est encore candidat, puis inscrit une cotisation en attente lorsque la candidature est approuvée. La validation de paiement reste manuelle.
+
+
+## Migrations 12–14 — Stabilisation des rôles et des paiements professionnels
+
+La liste à jour des migrations est maintenue dans `supabase/MIGRATIONS.md`. Les fichiers complémentaires sont :
+
+- `12_TROISIEME_ET_VALIDATION_CANDIDATURES.sql` : séries actives, fonctions RPC consommées par l'interface et redépôt d'une candidature rejetée sur le même compte.
+- `13_MVOLA_COORDONNEES_ET_PREPARATION_PAIE.sql` : coordonnées professionnelles et vérification administrative initiale.
+- `14_STABILISATION_MVOLA_ET_CANDIDATURES.sql` : correction additive de la conservation de la vérification et restauration des contrôles de la première cotisation partenaire.
+
+Ordre : 12 → 13 → 14, après les migrations 01–10. Le diagnostic 11 reste en lecture seule. Les migrations déjà exécutées ne doivent pas être rejouées.

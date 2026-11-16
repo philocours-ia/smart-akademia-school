@@ -15,19 +15,20 @@ Après connexion avec un compte administrateur reconnu par Supabase, le tableau 
 
 1. Les dossiers d'inscription des élèves.
 2. Les candidatures professionnelles (enseignants, partenaires, promoteurs).
-3. Les cotisations partenaires à examiner.
+3. Les coordonnées MVola professionnelles à vérifier manuellement.
+4. Les cotisations partenaires à examiner.
 
 Les dossiers élèves et candidatures affichent les données enregistrées et des liens signés temporaires vers leurs pièces privées. Les validations sont toujours exécutées par les fonctions RPC protégées de Supabase. Une pièce privée non consultable bloque l'approbation dans l'interface et doit faire l'objet d'une vérification Storage/RLS.
 
-## Migrations
+## Migrations et stabilisation
 
-Ce correctif ne demande pas de nouvelle migration SQL. Il utilise les tables et fonctions déjà présentes dans les migrations 05, 06, 07 et 10 (ainsi que les fonctions administrateur définies précédemment). Si une requête affiche une erreur RLS ou une table absente, corriger la configuration Supabase existante avant toute décision.
+La branche de stabilisation ajoute les migrations 12 et 14 ; la migration 13 existante est conservée sans modification. L'ordre complet est documenté dans `supabase/MIGRATIONS.md`. Les migrations 12 → 13 → 14 s'exécutent après 01–10 sur une base qui ne les possède pas encore. Sur une base déjà active, comparer d'abord l'historique Supabase et le contenu réellement appliqué ; ne jamais rejouer une migration déjà passée.
 
 ## Fichiers principaux
 
 - `site/index.html` : tableau de bord, boîte de validation, dossiers élèves.
 - `site/role-portal.js` : candidatures professionnelles, cotisations et actions admin.
-- `site/service-worker.js` : cache PWA v14 pour charger la nouvelle interface.
+- `site/service-worker.js` : cache PWA v18 ; les navigations secondaires ne remplacent plus le cache de la page d'accueil.
 - `supabase/` : migrations historiques, non modifiées par ce correctif.
 
 ## Contrôles locaux réalisés
@@ -52,3 +53,17 @@ Les groupes de champs requis des candidatures enseignant, promoteur et partenair
 ## Correctif des formulaires d'inscription professionnels (v16)
 
 Les pièces justificatives ne dépendent plus d'un bloc vide généré uniquement à l'exécution. Les champs des profils enseignant, promoteur et partenaire sont maintenant présents dans `site/index.html`; `role-portal.js` affiche le groupe adapté au profil choisi et désactive les champs des autres profils. La validation vérifie la présence des pièces avant l'appel à Supabase Auth. Le service worker passe en cache v16 et le script est chargé avec `?v=16-proof-fields`. Aucune migration SQL supplémentaire n'est requise. Voir `docs/CORRECTIF_PIECES_INSCRIPTION_PROFILS_2026-11-14.md`.
+
+
+## Stabilisation des rôles — 16 novembre 2026 (branche de correction)
+
+Le correctif coordonne le parcours candidat, l'administration et Supabase :
+
+- Les RPC appelées par le navigateur pour la décision d'une candidature et l'affichage des enseignants affectés sont ajoutées dans la migration 12.
+- Les nouvelles inscriptions élèves et affectations sont limitées à Troisième (T9) et Terminale L/S/OSE ; les anciennes séries restent acceptées pour préserver les comptes historiques.
+- Une candidature refusée peut être redéposée sur le même compte. Une seule demande du même type peut rester en attente.
+- Les candidatures professionnelles recueillent le numéro MVola, le nom exact du titulaire et la déclaration correspondante. L'administration dispose d'un espace de contrôle ; aucune approbation n'est possible avant vérification manuelle du titulaire.
+- L'actualisation d'un compte ne révoque plus une vérification MVola inchangée. L'approbation partenaire conserve la vérification séparée de sa première cotisation.
+- Le cache PWA n'enregistre plus une page d'administration sous la clé de la page d'accueil.
+
+**Limite de validation :** les sources ont été modifiées sur une branche isolée. Le projet Supabase distant, les comptes réels, les politiques RLS/Storage et le déploiement Netlify n'ont pas été exécutés ni vérifiés depuis cette session. Voir `docs/STABILISATION_ROLES_2026-11-16.md` pour les vérifications nécessaires avant fusion et déploiement.

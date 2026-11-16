@@ -79,6 +79,16 @@ async function processPendingSignupEvidence(profile) {
     }
 
     if (draft.kind === 'applicant' && profile.role === 'applicant' && profile.requestedRole === draft.applicantType) {
+        const { data: mvolaResult, error: mvolaError } = await supabaseClient.rpc('save_akademia_mvola_profile', {
+            p_mvola_number: draft.mvolaNumber,
+            p_mvola_account_name: draft.mvolaAccountName,
+            p_owner_confirmed: draft.mvolaOwnerConfirmed === true
+        });
+        if (mvolaError) throw mvolaError;
+        draft.mvolaNumber = mvolaResult?.mvola_number || draft.mvolaNumber;
+        draft.mvolaAccountName = mvolaResult?.mvola_account_name || draft.mvolaAccountName;
+        draft.mvolaOwnerConfirmed = true;
+        await savePendingSignupEvidence(profile.email, draft);
         if (draft.uploadedPaths) return true;
         const uploadedPaths = {};
         const newlyUploaded = [];
@@ -100,7 +110,9 @@ async function processPendingSignupEvidence(profile) {
             kind: 'applicant', applicantType: draft.applicantType, paymentMethod: draft.paymentMethod || null,
             transactionReference: draft.transactionReference || null, uploadedPaths,
             specialty: draft.specialty || null, diplomaLevel: draft.diplomaLevel || null,
-            organizationName: draft.organizationName || null, createdAt: draft.createdAt || new Date().toISOString()
+            organizationName: draft.organizationName || null,
+            mvolaNumber: draft.mvolaNumber, mvolaAccountName: draft.mvolaAccountName, mvolaOwnerConfirmed: true,
+            createdAt: draft.createdAt || new Date().toISOString()
         });
         return true;
         } catch (error) {
@@ -178,7 +190,21 @@ async function handleApplicantSignup(e) {
     if (!['teacher', 'partner', 'promoter'].includes(type)) return showToast('Type de candidature invalide.', 'error');
     if (password.length < 12) return showToast('Le mot de passe doit contenir au moins 12 caractères.', 'error');
     if (password !== confirm) return showToast('Les deux mots de passe ne correspondent pas.', 'error');
-    const draft = { kind: 'applicant', applicantType: type, createdAt: new Date().toISOString() };
+    const draft = {
+        kind: 'applicant',
+        applicantType: type,
+        mvolaNumber: document.getElementById('applicant-mvola-number')?.value.trim(),
+        mvolaAccountName: document.getElementById('applicant-mvola-account-name')?.value.trim(),
+        mvolaOwnerConfirmed: document.getElementById('applicant-mvola-owner-confirmed')?.checked === true,
+        createdAt: new Date().toISOString()
+    };
+    const digits = (draft.mvolaNumber || '').replace(/[^0-9]/g, '');
+    if (!/^(0|261)(32|33|34|38|39)[0-9]{7}$/.test(digits)) {
+        return showToast('Renseignez un numéro MVola valide au format 034XXXXXXX ou +26134XXXXXXX.', 'error');
+    }
+    if ((draft.mvolaAccountName || '').length < 3 || !draft.mvolaOwnerConfirmed) {
+        return showToast('Le nom exact du titulaire et sa confirmation sont obligatoires.', 'error');
+    }
     const submitButton = e.submitter || e.target.querySelector('button[type=submit]');
     if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Vérification des pièces…'; }
     let accountCreated = false;
@@ -309,13 +335,69 @@ async function renderRolePortal() {
     try {
         if (user.role === 'student' && user.registrationStatus !== 'approved') return await renderStudentEnrollmentWorkspace(host, user);
         if (user.role === 'applicant') return await renderApplicantWorkspace(host, user);
-        if (user.role === 'teacher') return await renderTeacherWorkspace(host, user);
-        if (user.role === 'partner') return await renderPartnerWorkspace(host, user);
-        if (user.role === 'promoter') return await renderPromoterWorkspace(host, user);
+        if (user.role === 'teacher') {
+            await renderTeacherWorkspace(host, user);
+            await prependMvolaProfileSettings(host, user);
+            return;
+        }
+        if (user.role === 'partner') {
+            await renderPartnerWorkspace(host, user);
+            await prependMvolaProfileSettings(host, user);
+            return;
+        }
+        if (user.role === 'promoter') {
+            await renderPromoterWorkspace(host, user);
+            await prependMvolaProfileSettings(host, user);
+            return;
+        }
         host.innerHTML = `<section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900 space-y-2"><strong>Votre espace n’est pas associé à un profil reconnu.</strong><p>Rôle reçu : ${escapeHtml(user.role || 'non renseigné')}. Contactez l’administration pour vérifier votre profil.</p><button onclick="logoutRolePortal()" class="rounded-lg border px-3 py-2 text-xs font-bold">Retour à la connexion</button></section>`;
     } catch (error) {
         console.error('Chargement de l’espace Smart Akademia :', error);
         host.innerHTML = `<section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-950 space-y-3"><strong>Le chargement de votre espace a rencontré une erreur inattendue.</strong><p class="text-xs">La session reste ouverte. Vous pouvez réessayer sans créer un autre compte.</p><details class="rounded-lg border border-rose-200 bg-white p-3"><summary class="cursor-pointer text-xs font-bold">Détail technique</summary><p class="mt-2 text-xs break-words">${escapeHtml(error?.message || String(error))}</p></details><button type="button" onclick="refreshRolePortal()" class="rounded-lg bg-navy-900 text-gold-400 px-4 py-2 text-xs font-bold">Réessayer</button></section>`;
+    }
+}
+
+async function prependMvolaProfileSettings(host, user) {
+    if (!host || !user?.id || !['teacher','partner','promoter'].includes(user.role)) return;
+    const { data, error } = await supabaseClient.from('profiles')
+        .select('mvola_number,mvola_account_name,mvola_owner_confirmed,mvola_verified_at')
+        .eq('id', user.id).maybeSingle();
+    const card = document.createElement('section');
+    card.className = 'mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 space-y-3';
+    if (error) {
+        card.innerHTML = `<p class="text-sm font-bold text-indigo-950">Coordonnées de paiement professionnel</p><p class="text-xs text-indigo-900">La rubrique MVola n’est pas disponible. Vérifiez que la migration 13 est appliquée. ${escapeHtml(error.message || '')}</p>`;
+    } else {
+        const profile = data || {};
+        card.innerHTML = `<div><p class="text-xs uppercase tracking-widest font-bold text-indigo-700">Coordonnées de paiement professionnel</p><h3 class="font-bold text-indigo-950 mt-1">Mon compte MVola</h3><p class="text-[11px] text-indigo-800 mt-1">Le titulaire et les coordonnées doivent être vérifiés par l’administration avant toute validation de paiement.</p></div>
+            <p class="text-xs ${profile.mvola_verified_at ? 'text-emerald-800' : 'text-amber-800'}">${profile.mvola_verified_at ? 'Titulaire vérifié par l’administration.' : 'Titulaire non encore vérifié.'}</p>
+            <form onsubmit="saveProfessionalMvolaProfile(event)" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div><label class="block text-xs font-bold mb-1">Numéro MVola</label><input name="mvola_number" type="tel" required maxlength="24" class="auth-input" value="${escapeHtml(profile.mvola_number || '')}" placeholder="034XXXXXXX ou +26134XXXXXXX"></div>
+                <div><label class="block text-xs font-bold mb-1">Nom exact du titulaire</label><input name="mvola_account_name" type="text" required minlength="3" maxlength="120" class="auth-input" value="${escapeHtml(profile.mvola_account_name || '')}" placeholder="Nom figurant sur le compte"></div>
+                <label class="md:col-span-2 flex items-start gap-2 text-xs text-slate-700"><input name="mvola_owner_confirmed" type="checkbox" required class="mt-0.5" ${profile.mvola_owner_confirmed ? 'checked' : ''}> Je confirme que ce compte MVola est enregistré au nom indiqué.</label>
+                <div class="md:col-span-2"><button type="submit" class="rounded-lg bg-indigo-700 text-white px-4 py-2.5 text-xs font-bold">Enregistrer mes coordonnées</button></div>
+            </form>`;
+    }
+    host.prepend(card);
+}
+
+async function saveProfessionalMvolaProfile(e) {
+    e.preventDefault();
+    const user = state.currentUser;
+    if (!user?.id || !['teacher','partner','promoter'].includes(user.role) || !supabaseClient) {
+        return showToast('Cette action est réservée aux comptes professionnels actifs.', 'error');
+    }
+    const form = e.currentTarget;
+    try {
+        const { error } = await supabaseClient.rpc('save_akademia_mvola_profile', {
+            p_mvola_number: form.elements.mvola_number.value.trim(),
+            p_mvola_account_name: form.elements.mvola_account_name.value.trim(),
+            p_owner_confirmed: form.elements.mvola_owner_confirmed.checked === true
+        });
+        if (error) throw error;
+        showToast('Coordonnées enregistrées. La vérification administrative reste nécessaire.', 'success');
+        await renderRolePortal();
+    } catch (error) {
+        showToast(error.message || 'Coordonnées MVola non enregistrées.', 'error');
     }
 }
 
@@ -396,57 +478,142 @@ async function submitStudentEnrollment(e) {
 }
 
 async function renderApplicantWorkspace(host, user) {
-    const { data, error } = await supabaseClient.from('role_applications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1);
+    const { data, error } = await supabaseClient.from('role_applications').select('*')
+        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(1);
     if (error) {
         host.innerHTML = roleMigrationNotice(error);
         return;
     }
-    const application = data?.[0];
-    if (application) {
-        const statusClass = application.status === 'approved' ? 'emerald' : application.status === 'rejected' ? 'rose' : 'amber';
-        host.innerHTML = `<div class="bg-white rounded-2xl p-6 border border-slate-200 space-y-3">
-            <p class="text-xs font-bold uppercase tracking-widest text-slate-500">Votre candidature</p>
-            <h2 class="font-display text-xl font-bold text-navy-900">${escapeHtml(application.application_type === 'teacher' ? 'Enseignant' : application.application_type === 'partner' ? 'Partenaire' : 'Promoteur')}</h2>
-            <span class="inline-block rounded-full px-3 py-1 text-xs font-bold bg-${statusClass}-100 text-${statusClass}-800">${escapeHtml(application.status === 'pending' ? 'En attente de validation' : application.status === 'approved' ? 'Candidature approuvée' : 'Candidature refusée')}</span>
-            <p class="text-sm text-slate-600">Déposée le ${new Date(application.created_at).toLocaleString('fr-FR')}.</p>
-            ${application.review_note ? `<p class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Note de l’administration : ${escapeHtml(application.review_note)}</p>` : ''}
-            <p class="text-xs text-slate-500">Une décision est prise par l'administration après examen des informations et pièces transmises. Ne créez pas un second compte pour la même candidature.</p>
-            <button onclick="refreshRolePortal()" class="rounded-xl border px-4 py-2 text-xs font-bold">Actualiser le statut</button>
-        </div>`;
+
+    const application = data?.[0] || null;
+    const evidenceDraft = await getPendingSignupEvidence(user.email).catch(() => null);
+    const type = user.requestedRole;
+    const label = type === 'teacher' ? 'Candidature enseignant'
+        : type === 'partner' ? 'Candidature partenaire' : 'Candidature promoteur';
+
+    const mvolaNumber = evidenceDraft?.mvolaNumber || application?.mvola_number || '';
+    const mvolaName = evidenceDraft?.mvolaAccountName || application?.mvola_account_name || '';
+    const mvolaConfirmed = evidenceDraft?.mvolaOwnerConfirmed || application?.mvola_owner_confirmed;
+    const mvolaFields =
+        '<div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">' +
+          '<div><p class="text-xs font-bold text-indigo-950">Compte MVola nominatif — coordonnées de versement</p>' +
+          '<p class="text-[11px] text-indigo-800 mt-1">Ces coordonnées seront utilisées pour les éventuels paiements professionnels. L’administration doit contrôler le titulaire avant toute approbation.</p></div>' +
+          '<div><label class="block text-xs font-bold mb-1" for="candidate-mvola-number">Numéro MVola</label>' +
+          '<input id="candidate-mvola-number" type="tel" required maxlength="24" autocomplete="tel" class="auth-input" value="' + escapeHtml(mvolaNumber) + '" placeholder="034XXXXXXX ou +26134XXXXXXX"></div>' +
+          '<div><label class="block text-xs font-bold mb-1" for="candidate-mvola-account-name">Nom exact du titulaire MVola</label>' +
+          '<input id="candidate-mvola-account-name" type="text" required minlength="3" maxlength="120" class="auth-input" value="' + escapeHtml(mvolaName) + '" placeholder="Nom correspondant au compte MVola"></div>' +
+          '<label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-mvola-owner-confirmed" type="checkbox" required class="mt-0.5" ' +
+          (mvolaConfirmed ? 'checked' : '') + '> Je confirme que ce compte MVola est enregistré au nom indiqué ci-dessus.</label>' +
+        '</div>';
+
+    if (application && application.status !== 'rejected') {
+        const statusClass = application.status === 'approved' ? 'emerald' : 'amber';
+        const statusText = application.status === 'pending' ? 'En attente de validation' : 'Candidature approuvée';
+        const reviewNote = application.review_note
+            ? '<p class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Note de l’administration : ' + escapeHtml(application.review_note) + '</p>'
+            : '';
+        host.innerHTML =
+            '<div class="bg-white rounded-2xl p-6 border border-slate-200 space-y-3">' +
+              '<p class="text-xs font-bold uppercase tracking-widest text-slate-500">Votre candidature</p>' +
+              '<h2 class="font-display text-xl font-bold text-navy-900">' +
+                escapeHtml(application.application_type === 'teacher' ? 'Enseignant' : application.application_type === 'partner' ? 'Partenaire' : 'Promoteur') +
+              '</h2>' +
+              '<span class="inline-block rounded-full px-3 py-1 text-xs font-bold bg-' + statusClass + '-100 text-' + statusClass + '-800">' +
+                escapeHtml(statusText) + '</span>' +
+              '<p class="text-sm text-slate-600">Déposée le ' + new Date(application.created_at).toLocaleString('fr-FR') + '.</p>' +
+              reviewNote +
+              '<p class="text-xs text-slate-500">Votre candidature est enregistrée. Vous pouvez actualiser vos coordonnées MVola tant que la décision administrative n’est pas définitive.</p>' +
+              '<form onsubmit="saveApplicantMvolaProfile(event)" class="space-y-3">' + mvolaFields +
+                '<button type="submit" class="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-900">Enregistrer / actualiser mes coordonnées MVola</button>' +
+              '</form>' +
+              '<button onclick="refreshRolePortal()" class="rounded-xl border px-4 py-2 text-xs font-bold">Actualiser le statut</button>' +
+            '</div>';
         return;
     }
-    const type = user.requestedRole;
+
     if (!['teacher', 'partner', 'promoter'].includes(type)) {
         host.innerHTML = '<div class="bg-white rounded-2xl p-6 border border-rose-200 text-sm text-rose-800">Le type de candidature n’est pas configuré sur ce profil. Contactez l’administration.</div>';
         return;
     }
-    const label = type === 'teacher' ? 'Candidature enseignant' : type === 'partner' ? 'Candidature partenaire' : 'Candidature promoteur';
-    const evidenceDraft = await getPendingSignupEvidence(user.email).catch(() => null);
+
     const paths = evidenceDraft?.uploadedPaths || {};
     const hasTeacherProofs = !!(paths.identity_photo && paths.diploma_proof);
     const hasPartnerProof = !!paths.payment_proof;
     let typeFields = '';
+
     if (type === 'teacher') {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label><input id="candidate-specialty" required maxlength="120" class="auth-input" value="${escapeHtml(evidenceDraft?.specialty || '')}" placeholder="Intitulé exact figurant dans votre PE de référence"><p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE retenus. Aucun catalogue officiel non vérifié n’est présélectionné.</p></div>
-        <div><label class="block text-xs font-bold mb-1">Diplôme le plus élevé</label><input id="candidate-diploma-level" required maxlength="120" class="auth-input" placeholder="Intitulé du diplôme"></div>
-        ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues avant la création du compte et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Les justificatifs doivent être déposés avant l’envoi de la candidature. Votre compte est antérieur au nouveau formulaire : vous pouvez joindre les deux pièces ci-dessous.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
+        const proofFields = hasTeacherProofs
+            ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues et transférées dans le stockage privé.</div>'
+            : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Joignez la photo d’identité et la preuve du diplôme avant le dépôt.</div>' +
+              '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
+                '<div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div>' +
+                '<div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>' +
+              '</div>';
+        typeFields =
+            '<div><label class="block text-xs font-bold mb-1">Spécialité / matière proposée</label>' +
+            '<input id="candidate-specialty" required maxlength="120" class="auth-input" value="' + escapeHtml(evidenceDraft?.specialty || application?.specialty || '') + '" placeholder="Intitulé exact figurant dans votre PE de référence">' +
+            '<p class="mt-1 text-[11px] text-slate-500">L’affectation définitive et les séries seront confirmées par l’administrateur à partir des documents PE/RAPE vérifiés.</p></div>' +
+            '<div><label class="block text-xs font-bold mb-1">Diplôme le plus élevé</label>' +
+            '<input id="candidate-diploma-level" required maxlength="120" class="auth-input" value="' + escapeHtml(application?.diploma_level || '') + '" placeholder="Intitulé du diplôme"></div>' +
+            proofFields;
     } else if (type === 'promoter') {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label><select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option><option ${evidenceDraft?.diplomaLevel === 'Baccalauréat' ? 'selected' : ''}>Baccalauréat</option><option ${evidenceDraft?.diplomaLevel === 'Bac+2' ? 'selected' : ''}>Bac+2</option><option ${evidenceDraft?.diplomaLevel === 'Licence' ? 'selected' : ''}>Licence</option><option ${evidenceDraft?.diplomaLevel === 'Master' ? 'selected' : ''}>Master</option><option ${evidenceDraft?.diplomaLevel === 'Doctorat' ? 'selected' : ''}>Doctorat</option></select><p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>
-        ${hasTeacherProofs ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues avant la création du compte et transférées dans le stockage privé.</div>' : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Les justificatifs doivent être déposés avant l’envoi de la candidature. Votre compte est antérieur au nouveau formulaire : joignez les deux pièces ci-dessous.</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div></div>'}`;
+        const levels = ['Baccalauréat', 'Bac+2', 'Licence', 'Master', 'Doctorat'];
+        const currentLevel = evidenceDraft?.diplomaLevel || application?.diploma_level || '';
+        const levelOptions = levels.map(level =>
+            '<option value="' + escapeHtml(level) + '"' + (currentLevel === level ? ' selected' : '') + '>' + escapeHtml(level) + '</option>'
+        ).join('');
+        const proofFields = hasTeacherProofs
+            ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Photo d’identité et preuve du diplôme reçues et transférées dans le stockage privé.</div>'
+            : '<div class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Joignez la photo d’identité et la preuve du diplôme avant le dépôt.</div>' +
+              '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
+                '<div><label class="block text-xs font-bold mb-1">Photo d’identité</label><input id="candidate-identity-file" type="file" required accept="image/jpeg,image/png,image/webp" class="auth-input"></div>' +
+                '<div><label class="block text-xs font-bold mb-1">Preuve du diplôme</label><input id="candidate-diploma-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>' +
+              '</div>';
+        typeFields =
+            '<div><label class="block text-xs font-bold mb-1">Niveau du diplôme</label>' +
+            '<select id="candidate-diploma-level" required class="auth-input"><option value="">Choisir</option>' + levelOptions + '</select>' +
+            '<p class="mt-1 text-[11px] text-slate-500">Niveau minimum requis : Baccalauréat.</p></div>' +
+            proofFields;
     } else {
-        typeFields = `<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label><input id="candidate-organization" required maxlength="180" class="auth-input" value="${escapeHtml(evidenceDraft?.organizationName || user.name || '')}"></div>
-        <label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5"> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme.</label>
-        ${hasPartnerProof ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Preuve de la première cotisation, mode de paiement et référence reçus avant la création du compte.</div>' : '<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La preuve de la première cotisation mensuelle de 100 000 Ar et la référence FINANCEMENT sont obligatoires avant le dépôt de candidature.</div><div><label class="block text-xs font-bold mb-1">Mode de paiement</label><select id="candidate-partner-payment-method" required class="auth-input"><option value="">Choisir</option><option value="MVola">MVola</option><option value="Binance Pay">Binance Pay</option></select></div><div><label class="block text-xs font-bold mb-1">Référence de transaction</label><input id="candidate-partner-transaction-reference" required minlength="3" class="auth-input"></div><div><label class="block text-xs font-bold mb-1">Preuve de paiement</label><input id="candidate-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>'}`;
+        const commitmentChecked = application?.monthly_commitment_accepted ? ' checked' : '';
+        const proofFields = hasPartnerProof
+            ? '<div class="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">✓ Preuve de première cotisation reçue et transférée dans le stockage privé.</div>'
+            : '<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">La preuve de la première cotisation de 100 000 Ar et la référence FINANCEMENT sont obligatoires.</div>' +
+              '<div><label class="block text-xs font-bold mb-1">Mode de paiement</label><select id="candidate-partner-payment-method" required class="auth-input">' +
+                '<option value="">Choisir</option><option value="MVola"' + (evidenceDraft?.paymentMethod === 'MVola' ? ' selected' : '') + '>MVola</option>' +
+                '<option value="Binance Pay"' + (evidenceDraft?.paymentMethod === 'Binance Pay' ? ' selected' : '') + '>Binance Pay</option>' +
+              '</select></div>' +
+              '<div><label class="block text-xs font-bold mb-1">Référence de transaction</label>' +
+                '<input id="candidate-partner-transaction-reference" required minlength="3" class="auth-input" value="' + escapeHtml(evidenceDraft?.transactionReference || '') + '">' +
+              '</div>' +
+              '<div><label class="block text-xs font-bold mb-1">Preuve de paiement</label><input id="candidate-partner-proof-file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" class="auth-input"></div>';
+        typeFields =
+            '<div><label class="block text-xs font-bold mb-1">Nom du partenaire ou de l’organisme</label>' +
+            '<input id="candidate-organization" required maxlength="180" class="auth-input" value="' + escapeHtml(evidenceDraft?.organizationName || application?.organization_name || user.name || '') + '"></div>' +
+            '<label class="flex items-start gap-2 text-xs text-slate-700"><input id="candidate-partner-commitment" type="checkbox" required class="mt-0.5"' + commitmentChecked + '> J’accepte la cotisation mensuelle de 100 000 Ar destinée à la maintenance et au financement des projets de la plateforme.</label>' +
+            proofFields;
     }
-    host.innerHTML = `<div class="bg-white rounded-2xl p-5 md:p-7 border border-slate-200 space-y-4">
-        <div><p class="text-xs uppercase tracking-widest font-bold text-gold-600">Dossier à compléter</p><h2 class="font-display text-xl font-bold text-navy-900 mt-1">${label}</h2><p class="text-sm text-slate-600 mt-2">Compte : ${escapeHtml(user.email)} • ${escapeHtml(user.phone || 'Téléphone non renseigné')}</p></div>
-        <form id="role-application-form" onsubmit="submitRoleApplication(event)" class="space-y-4">
-          ${typeFields}
-          <div><label class="block text-xs font-bold mb-1">Informations complémentaires (facultatif)</label><textarea id="candidate-extra-note" rows="3" maxlength="2000" class="auth-input" placeholder="Précisions utiles pour l’examen de votre candidature"></textarea></div>
-          <button type="submit" class="rounded-xl bg-navy-900 text-gold-400 px-5 py-3 text-sm font-bold">Déposer ma candidature</button>
-        </form>
-        <p class="text-[11px] text-slate-500">Les pièces sont déposées dans un espace privé. Aucune vérification faciale/KYC n’est activée dans cette version ; aucune donnée biométrique n’est collectée.</p>
-    </div>`;
+
+    const rejectedNotice = application?.status === 'rejected'
+        ? '<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><strong>Votre précédente candidature a été refusée.</strong>' +
+          (application.review_note ? '<p class="mt-1">Motif : ' + escapeHtml(application.review_note) + '</p>' : '') +
+          '<p class="mt-1 text-xs">Corrigez les éléments demandés puis déposez une nouvelle candidature avec le même compte.</p></div>'
+        : '';
+    const submitLabel = application?.status === 'rejected' ? 'Redéposer ma candidature' : 'Déposer ma candidature';
+
+    host.innerHTML =
+        '<div class="bg-white rounded-2xl p-5 md:p-7 border border-slate-200 space-y-4">' +
+          rejectedNotice +
+          '<div><p class="text-xs uppercase tracking-widest font-bold text-gold-600">Dossier à compléter</p>' +
+            '<h2 class="font-display text-xl font-bold text-navy-900 mt-1">' + label + '</h2>' +
+            '<p class="text-sm text-slate-600 mt-2">Compte : ' + escapeHtml(user.email) + ' • ' + escapeHtml(user.phone || 'Téléphone non renseigné') + '</p></div>' +
+          '<form id="role-application-form" onsubmit="submitRoleApplication(event)" class="space-y-4">' +
+            mvolaFields + typeFields +
+            '<div><label class="block text-xs font-bold mb-1">Informations complémentaires (facultatif)</label><textarea id="candidate-extra-note" rows="3" maxlength="2000" class="auth-input" placeholder="Précisions utiles pour l’examen de votre candidature"></textarea></div>' +
+            '<button type="submit" class="rounded-xl bg-navy-900 text-gold-400 px-5 py-3 text-sm font-bold">' + submitLabel + '</button>' +
+          '</form>' +
+          '<p class="text-[11px] text-slate-500">Les pièces sont déposées dans un espace privé. Le titulaire MVola est contrôlé manuellement par l’administration ; aucune vérification automatique du compte MVola ou biométrie n’est activée.</p>' +
+        '</div>';
 }
 
 function roleMigrationNotice(error) {
@@ -486,6 +653,18 @@ async function submitRoleApplication(e) {
         const documents = [];
         const draft = await getPendingSignupEvidence(user.email).catch(() => null);
         const paths = draft?.uploadedPaths || {};
+        const mvolaNumber = document.getElementById('candidate-mvola-number')?.value.trim() || draft?.mvolaNumber;
+        const mvolaAccountName = document.getElementById('candidate-mvola-account-name')?.value.trim() || draft?.mvolaAccountName;
+        const mvolaOwnerConfirmed = document.getElementById('candidate-mvola-owner-confirmed')?.checked === true || draft?.mvolaOwnerConfirmed === true;
+        if (!mvolaNumber || !mvolaAccountName || !mvolaOwnerConfirmed) {
+            throw new Error('Renseignez le numéro MVola, le titulaire exact et confirmez-en la propriété.');
+        }
+        const { data: mvolaResult, error: mvolaError } = await supabaseClient.rpc('save_akademia_mvola_profile', {
+            p_mvola_number: mvolaNumber,
+            p_mvola_account_name: mvolaAccountName,
+            p_owner_confirmed: mvolaOwnerConfirmed
+        });
+        if (mvolaError) throw mvolaError;
         if (type === 'teacher') {
             specialty = document.getElementById('candidate-specialty').value.trim();
             diplomaLevel = document.getElementById('candidate-diploma-level').value.trim();
@@ -529,7 +708,10 @@ async function submitRoleApplication(e) {
         const { error } = await supabaseClient.from('role_applications').insert({
             user_id: user.id, application_type: type, applicant_name: user.name || '', applicant_email: user.email,
             phone: user.phone || '', specialty, diploma_level: diplomaLevel, organization_name: organizationName,
-            monthly_commitment_accepted: commitment, documents
+            monthly_commitment_accepted: commitment, documents,
+            mvola_number: mvolaResult?.mvola_number || mvolaNumber,
+            mvola_account_name: mvolaResult?.mvola_account_name || mvolaAccountName,
+            mvola_owner_confirmed: true
         });
         if (error) throw error;
         await deletePendingSignupEvidence(user.email).catch(() => {});
@@ -965,7 +1147,8 @@ async function renderRoleAdminLists() {
         staff: document.getElementById('admin-staff-requests-list'),
         workdays: document.getElementById('admin-teacher-workday-list'),
         resources: document.getElementById('admin-teacher-resources-list'),
-        promoters: document.getElementById('admin-promoter-tracking-list')
+        promoters: document.getElementById('admin-promoter-tracking-list'),
+        mvola: document.getElementById('admin-mvola-profiles-list')
     };
     const queries = await Promise.all([
         supabaseClient.from('role_applications').select('*').order('created_at',{ascending:false}),
@@ -975,9 +1158,10 @@ async function renderRoleAdminLists() {
         supabaseClient.from('profiles').select('id,full_name,email,series').eq('role','teacher').order('full_name'),
         supabaseClient.from('teacher_resources').select('*').order('created_at',{ascending:false}),
         supabaseClient.from('profiles').select('id,full_name,email,referral_code').eq('role','promoter').order('full_name'),
-        supabaseClient.from('promoter_commissions').select('promoter_id,student_id,amount_ar,created_at').order('created_at',{ascending:false})
+        supabaseClient.from('promoter_commissions').select('promoter_id,student_id,amount_ar,created_at').order('created_at',{ascending:false}),
+        supabaseClient.rpc('list_akademia_mvola_profiles')
     ]);
-    const [apps, partners, finance, staff, teachers, resources, promotersResult, commissionsResult] = queries;
+    const [apps, partners, finance, staff, teachers, resources, promotersResult, commissionsResult, mvolaProfiles] = queries;
     const showError = (node, label, error) => { if (node) node.innerHTML = `<div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>${label} indisponible.</strong><br>${escapeHtml(error?.message || 'Vérifiez les droits RLS et les migrations Supabase correspondantes.')}</div>`; };
 
     if (apps.error) showError(targets.applications, 'Candidatures professionnelles', apps.error);
@@ -1004,6 +1188,30 @@ async function renderRoleAdminLists() {
     else await renderAdminTeacherResources(resources.data || []);
     if (promotersResult.error || commissionsResult.error) showError(targets.promoters, 'Suivi des promoteurs', promotersResult.error || commissionsResult.error);
     else await renderAdminPromoters(promotersResult.data || [], commissionsResult.data || []);
+    if (mvolaProfiles.error) showError(targets.mvola, 'Comptes MVola professionnels', mvolaProfiles.error);
+    else await renderAdminMvolaProfiles(mvolaProfiles.data || []);
+}
+
+async function renderAdminMvolaProfiles(rows) {
+    const el = document.getElementById('admin-mvola-profiles-list');
+    if (!el) return;
+    if (!rows.length) {
+        el.innerHTML = '<p class="text-xs text-slate-500">Aucun compte professionnel à vérifier pour le moment.</p>';
+        return;
+    }
+    el.innerHTML = rows.map(profile => {
+        const complete = !!(profile.mvola_number && profile.mvola_account_name && profile.mvola_owner_confirmed);
+        const verified = !!profile.mvola_verified_at;
+        return `<article class="rounded-xl border border-slate-200 p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-sm">${escapeHtml(profile.full_name || profile.email || profile.user_id)}</strong><span class="rounded-full px-2 py-1 text-[10px] font-bold ${verified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}">${verified ? 'Vérifié' : 'À vérifier'}</span></div>
+            <p class="text-xs text-slate-600">${escapeHtml(profile.role)} • ${escapeHtml(profile.email || '')}</p>
+            <p class="text-xs">Numéro : <strong class="font-mono">${escapeHtml(profile.mvola_number || 'Non renseigné')}</strong></p>
+            <p class="text-xs">Titulaire déclaré : <strong>${escapeHtml(profile.mvola_account_name || 'Non renseigné')}</strong></p>
+            <p class="text-[10px] text-slate-500">${profile.mvola_owner_confirmed ? 'Déclaration du titulaire confirmée par le compte.' : 'Déclaration du titulaire manquante.'}</p>
+            ${complete && !verified ? `<button type="button" onclick="adminVerifyMvolaProfile('${profile.user_id}')" class="rounded-lg bg-indigo-700 text-white px-3 py-2 text-xs font-bold">Confirmer le contrôle du titulaire</button>` : ''}
+            ${verified ? `<p class="text-[10px] text-emerald-800">Vérifié le ${new Date(profile.mvola_verified_at).toLocaleString('fr-FR')}</p>` : ''}
+        </article>`;
+    }).join('');
 }
 
 async function renderAdminApplications(apps) {
@@ -1032,15 +1240,42 @@ async function renderAdminApplications(apps) {
         const assignment = a.application_type === 'teacher' ? `<div class="rounded-xl bg-indigo-50 border border-indigo-100 p-3 mt-3"><p class="text-xs font-bold text-indigo-950 mb-2">Affectation à confirmer avant approbation</p><div class="grid grid-cols-1 md:grid-cols-2 gap-2"><div><label class="block text-[10px] font-bold mb-1">Matière / spécialité</label><input name="subject" required value="${escapeHtml(a.specialty || '')}" placeholder="Matière à confirmer" class="auth-input"></div><div><span class="block text-[10px] font-bold mb-1">Séries concernées</span><div class="grid grid-cols-2 gap-1 text-[11px]">${AKADEMIA_SERIES.map(x => `<label class="flex items-center gap-1"><input type="checkbox" name="series" value="${escapeHtml(x)}">${escapeHtml(x)}</label>`).join('')}</div></div></div><p class="text-[10px] text-indigo-800 mt-2">Ne confirmez que les séries et la spécialité compatibles avec les PE/RAPE vérifiés.</p></div>` : '';
         const teacherOrPromoter = ['teacher','promoter'].includes(a.application_type);
         const paymentDetails = a.application_type === 'partner' ? `<div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-100 p-3"><p class="text-xs font-bold text-emerald-950">Première cotisation partenaire</p><div class="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1 text-xs text-emerald-900"><p>Montant : <strong>${Number(payment.amount_ar || 100000).toLocaleString('fr-FR')} Ar</strong></p><p>Mode : <strong>${escapeHtml(payment.payment_method || 'Non renseigné')}</strong></p><p>Référence : <strong>${escapeHtml(payment.payment_reference || 'Non renseignée')}</strong></p><p>Transaction : <strong class="font-mono">${escapeHtml(payment.transaction_reference || 'Non renseignée')}</strong></p><p>Engagement mensuel : <strong>${a.monthly_commitment_accepted ? 'Accepté' : 'Non confirmé'}</strong></p></div></div>` : '';
+        const mvolaComplete = !!(a.mvola_number && a.mvola_account_name && a.mvola_owner_confirmed);
+        const mvolaVerified = !!a.mvola_verified_at;
+        const mvolaDetails = `<div class="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3 space-y-2">
+            <p class="text-xs font-bold text-violet-950">Compte MVola destiné aux paiements professionnels</p>
+            <p class="text-xs text-violet-900">Numéro : <strong class="font-mono">${escapeHtml(a.mvola_number || 'Non renseigné')}</strong></p>
+            <p class="text-xs text-violet-900">Titulaire déclaré : <strong>${escapeHtml(a.mvola_account_name || 'Non renseigné')}</strong></p>
+            <p class="text-[11px] ${mvolaVerified ? 'text-emerald-800' : 'text-amber-800'}">${mvolaVerified ? 'Titulaire vérifié par l’administration' : 'Vérification administrative du titulaire requise'}</p>
+            ${mvolaComplete && !mvolaVerified ? `<button type="button" onclick="adminVerifyMvolaProfile('${a.user_id}')" class="rounded-lg bg-violet-700 text-white px-3 py-2 text-xs font-bold">Confirmer le contrôle du titulaire</button>` : ''}
+        </div>`;
         const missing = [];
+        if (!mvolaComplete) missing.push('coordonnées MVola complètes');
+        else if (!mvolaVerified) missing.push('vérification du titulaire MVola');
         if (teacherOrPromoter && !hasDoc('identity_photo')) missing.push('photo d’identité');
         if (teacherOrPromoter && !hasDoc('diploma_proof')) missing.push('preuve du diplôme');
         if (a.application_type === 'partner' && !hasDoc('payment_proof')) missing.push('preuve de la première cotisation');
         const approvalAllowed = missing.length === 0 && allEvidenceAvailable;
-        cards.push(`<article class="rounded-xl border border-indigo-200 bg-white p-4 md:p-5 space-y-3 shadow-sm"><div class="flex flex-col lg:flex-row lg:justify-between gap-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h5 class="font-bold text-base text-navy-950">${escapeHtml(a.applicant_name || 'Nom non renseigné')}</h5><span class="rounded-full bg-amber-100 text-amber-900 px-2.5 py-1 text-[10px] font-bold">En attente</span><span class="rounded-full bg-indigo-100 text-indigo-900 px-2.5 py-1 text-[10px] font-bold">${typeLabel(a.application_type)}</span></div><div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 mt-2 text-xs text-slate-700"><p><span class="text-slate-500">E-mail :</span> ${escapeHtml(a.applicant_email || 'Non renseigné')}</p><p><span class="text-slate-500">Téléphone :</span> ${escapeHtml(a.phone || 'Non renseigné')}</p><p><span class="text-slate-500">Organisation :</span> ${escapeHtml(a.organization_name || 'Sans objet / non renseignée')}</p><p><span class="text-slate-500">Spécialité :</span> ${escapeHtml(a.specialty || 'Non renseignée')}</p><p><span class="text-slate-500">Diplôme :</span> ${escapeHtml(a.diploma_level || 'Non renseigné')}</p><p><span class="text-slate-500">Candidature déposée :</span> ${a.created_at ? new Date(a.created_at).toLocaleString('fr-FR') : 'Date inconnue'}</p><p class="sm:col-span-2 xl:col-span-3"><span class="text-slate-500">Référence du dossier :</span> <span class="font-mono">${escapeHtml(a.id)}</span></p></div>${paymentDetails}</div></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><p class="text-xs font-bold text-slate-800 mb-2">Pièces justificatives — ouvrir chaque document avant la décision</p><div class="flex flex-wrap gap-2">${links.join('') || '<span class="text-xs text-rose-700">Aucun justificatif consultable.</span>'}</div>${missing.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) manquante(s) : ${escapeHtml(missing.join(', '))}.</p>` : ''}${fileErrors.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) non consultable(s) : ${escapeHtml(fileErrors.join(' ; '))}. Vérifiez le bucket privé et les politiques Storage.</p>` : ''}</div>${assignment}<form class="space-y-2" onsubmit="adminReviewRoleApplication(event,'${a.id}','${a.application_type}')"><div><label class="block text-[10px] font-bold text-slate-600 mb-1">Note de décision (facultative)</label><textarea name="note" rows="2" maxlength="1000" class="auth-input" placeholder="Motif du refus, réserve ou commentaire administratif"></textarea></div><div class="flex flex-wrap items-center gap-2">${approvalAllowed ? `<button type="submit" name="decision" value="approved" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold"><i class="fas fa-check mr-1"></i>Valider la candidature</button>` : `<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-4 py-2.5 text-xs font-bold cursor-not-allowed">Approbation bloquée : justificatifs à vérifier</button>`}<button type="submit" name="decision" value="rejected" class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2.5 text-xs font-bold">Refuser la candidature</button></div></form></article>`);
+        cards.push(`<article class="rounded-xl border border-indigo-200 bg-white p-4 md:p-5 space-y-3 shadow-sm"><div class="flex flex-col lg:flex-row lg:justify-between gap-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h5 class="font-bold text-base text-navy-950">${escapeHtml(a.applicant_name || 'Nom non renseigné')}</h5><span class="rounded-full bg-amber-100 text-amber-900 px-2.5 py-1 text-[10px] font-bold">En attente</span><span class="rounded-full bg-indigo-100 text-indigo-900 px-2.5 py-1 text-[10px] font-bold">${typeLabel(a.application_type)}</span></div><div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 mt-2 text-xs text-slate-700"><p><span class="text-slate-500">E-mail :</span> ${escapeHtml(a.applicant_email || 'Non renseigné')}</p><p><span class="text-slate-500">Téléphone :</span> ${escapeHtml(a.phone || 'Non renseigné')}</p><p><span class="text-slate-500">Organisation :</span> ${escapeHtml(a.organization_name || 'Sans objet / non renseignée')}</p><p><span class="text-slate-500">Spécialité :</span> ${escapeHtml(a.specialty || 'Non renseignée')}</p><p><span class="text-slate-500">Diplôme :</span> ${escapeHtml(a.diploma_level || 'Non renseigné')}</p><p><span class="text-slate-500">Candidature déposée :</span> ${a.created_at ? new Date(a.created_at).toLocaleString('fr-FR') : 'Date inconnue'}</p><p class="sm:col-span-2 xl:col-span-3"><span class="text-slate-500">Référence du dossier :</span> <span class="font-mono">${escapeHtml(a.id)}</span></p></div>${paymentDetails}${mvolaDetails}</div></div><div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><p class="text-xs font-bold text-slate-800 mb-2">Pièces justificatives — ouvrir chaque document avant la décision</p><div class="flex flex-wrap gap-2">${links.join('') || '<span class="text-xs text-rose-700">Aucun justificatif consultable.</span>'}</div>${missing.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) manquante(s) : ${escapeHtml(missing.join(', '))}.</p>` : ''}${fileErrors.length ? `<p class="text-[11px] text-rose-700 mt-2">Pièce(s) non consultable(s) : ${escapeHtml(fileErrors.join(' ; '))}. Vérifiez le bucket privé et les politiques Storage.</p>` : ''}</div>${assignment}<form class="space-y-2" onsubmit="adminReviewRoleApplication(event,'${a.id}','${a.application_type}')"><div><label class="block text-[10px] font-bold text-slate-600 mb-1">Note de décision (facultative)</label><textarea name="note" rows="2" maxlength="1000" class="auth-input" placeholder="Motif du refus, réserve ou commentaire administratif"></textarea></div><div class="flex flex-wrap items-center gap-2">${approvalAllowed ? `<button type="submit" name="decision" value="approved" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold"><i class="fas fa-check mr-1"></i>Valider la candidature</button>` : `<button type="button" disabled class="rounded-lg bg-slate-200 text-slate-500 px-4 py-2.5 text-xs font-bold cursor-not-allowed">Approbation bloquée : justificatifs à vérifier</button>`}<button type="submit" name="decision" value="rejected" class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2.5 text-xs font-bold">Refuser la candidature</button></div></form></article>`);
     }
     const processedHtml = processed.length ? `<details class="rounded-xl border border-slate-200 bg-slate-50 p-3"><summary class="cursor-pointer text-xs font-bold text-slate-700">Historique des candidatures déjà traitées (${processed.length})</summary><div class="space-y-2 mt-3">${processed.map(a => `<div class="rounded-lg border bg-white p-3 text-xs"><div class="flex flex-wrap justify-between gap-2"><strong>${escapeHtml(a.applicant_name || a.applicant_email || 'Candidat')} — ${typeLabel(a.application_type)}</strong><span class="font-bold ${a.status === 'approved' ? 'text-emerald-700' : 'text-rose-700'}">${a.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></div><p class="text-slate-500 mt-1">${escapeHtml(a.applicant_email || '')} • ${a.reviewed_at ? new Date(a.reviewed_at).toLocaleString('fr-FR') : ''}</p>${a.review_note ? `<p class="mt-1">Note : ${escapeHtml(a.review_note)}</p>` : ''}</div>`).join('')}</div></details>` : '';
     el.innerHTML = (cards.length ? cards.join('') : '<div class="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500">Aucune candidature professionnelle en attente.</div>') + processedHtml;
+}
+
+async function adminVerifyMvolaProfile(userId) {
+    if (!state.isAdmin || !supabaseClient) return showToast('Action réservée à l’administration.', 'error');
+    try {
+        const { error } = await supabaseClient.rpc('admin_verify_akademia_mvola_profile', {
+            p_user_id: userId,
+            p_verified: true,
+            p_note: 'Contrôle manuel effectué par l’administration.'
+        });
+        if (error) throw error;
+        showToast('Vérification du compte MVola enregistrée.', 'success');
+        await renderAdminLists();
+    } catch (error) {
+        showToast(error.message || 'Vérification MVola impossible.', 'error');
+    }
 }
 
 async function adminReviewRoleApplication(e,id,type){
