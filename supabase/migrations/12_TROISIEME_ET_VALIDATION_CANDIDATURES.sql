@@ -149,7 +149,10 @@ begin
 
   return new;
 end;
-$$;
+$;
+-- Cette fonction n'est appelée que par le trigger Auth ; elle ne doit pas exposer
+-- un point d'entrée RPC public ou directement appelable par un client.
+revoke all on function public.handle_new_akademia_user() from public,anon,authenticated;
 
 -- 3) Les affectations créées après cette migration utilisent uniquement les séries actives.
 --    Les lignes historiques restent conservées et consultables par les anciens élèves concernés.
