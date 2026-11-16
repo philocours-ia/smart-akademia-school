@@ -36,7 +36,7 @@ jobs:
 
           html = Path("site/index.html").read_text(encoding="utf-8")
           pattern = re.compile(
-              r'<script\\b(?![^>]*\\bsrc\\s*=)[^>]*>([\\s\\S]*?)</script\\s*>',
+              r'<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)</script\s*>',
               re.IGNORECASE
           )
           scripts = [body for body in pattern.findall(html) if body.strip()]
