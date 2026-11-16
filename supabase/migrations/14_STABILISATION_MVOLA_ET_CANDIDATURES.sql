@@ -14,7 +14,7 @@ create or replace function public.save_akademia_mvola_profile(
 ) returns jsonb
 language plpgsql
 security definer
-set search_path=public
+set search_path=''
 as $$
 declare
   caller uuid := auth.uid();
@@ -103,7 +103,7 @@ create or replace function public.admin_review_role_application(
 ) returns text
 language plpgsql
 security definer
-set search_path=public
+set search_path=''
 as $$
 declare
   app public.role_applications%rowtype;
@@ -221,7 +221,7 @@ begin
   if p_decision='approved' then
     if app.application_type='promoter' then
       loop
-        code := upper(substr(encode(gen_random_bytes(8),'hex'),1,8));
+        code := upper(substr(encode(public.gen_random_bytes(8),'hex'),1,8));
         exit when not exists(select 1 from public.profiles where referral_code=code);
       end loop;
     else
